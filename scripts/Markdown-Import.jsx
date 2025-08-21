@@ -5,7 +5,7 @@
  * replacing Markdown tags with corresponding paragraph and character styles,
  * and converting Markdown footnotes into real InDesign footnotes.
  * 
- * @version 1.0 beta 7
+ * @version 1.0 beta 8
  * @license MIT
  * @author entremonde / Spectral lab
  * @website http://lab.spectral.art
@@ -382,7 +382,7 @@ var MarkdownImport = (function() {
         italicUnderscore: /_([^_]+)_/,
         underline: /\[([^\]]+)\]\{\.underline\}/,
         smallCapsAttr: /\[([^\]]+)\]\{\.smallcaps\}/,
-        superscript: /(?<!\[)\^([^^\r\[\]]+)\^(?!\])/,
+        superscript: /\^([^^\r]+)\^/,
         subscript: /~([^~]+)~/,
         footnoteRef: /\[\^([a-zA-Z0-9_-]+)\]/,
         footnoteDefinition: /^\[\^([^\]]+)\]:\s*(.+)/,
