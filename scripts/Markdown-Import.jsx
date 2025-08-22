@@ -14,7 +14,7 @@
 // Create a namespace to avoid polluting global scope
 var MarkdownImport = (function() {
     "use strict";
-    var VERSION = "1.0b7";
+    var VERSION = "1.0b8";
     
     // Set to true to enable logging in silent mode
     var enableLogging = false;
