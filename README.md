@@ -8,3 +8,11 @@
 The script automatically imports and transforms a Markdown text into a styled InDesign document, ready for layout. It replaces Markdown tags with the corresponding paragraph and character styles, and converts Markdown footnotes into actual InDesign footnotes.
 
 ➡️ [Download latest release](https://github.com/lab-Spectral/Markdown-Import/releases/latest)
+
+
+
+| <img src="docs/images/Markdown-import-screen1.png" style="max-width:100%; height:auto;"/> | <img src="docs/images/Markdown-import-screen2.png" style="max-width:100%; height:auto;"/> |
+|---|---|
+
+| <img src="docs/images/Markdown-import-config1.png" style="max-width:100%; height:auto;"/> | <img src="docs/images/Markdown-import-config2.png" style="max-width:100%; height:auto;"/> | <img src="docs/images/Markdown-import-config3.png" style="max-width:100%; height:auto;"/> |
+|---|---|---|
