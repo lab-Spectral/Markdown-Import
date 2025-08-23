@@ -5,7 +5,7 @@
  * replacing Markdown tags with corresponding paragraph and character styles,
  * and converting Markdown footnotes into real InDesign footnotes.
  * 
- * @version 1.0 beta 8
+ * @version 1.0 beta 9
  * @license MIT
  * @author entremonde / Spectral lab
  * @website http://lab.spectral.art
@@ -14,7 +14,7 @@
 // Create a namespace to avoid polluting global scope
 var MarkdownImport = (function() {
     "use strict";
-    var VERSION = "1.0b8";
+    var VERSION = "1.0b9";
     
     // Set to true to enable logging in silent mode
     var enableLogging = false;
@@ -382,13 +382,210 @@ var MarkdownImport = (function() {
         italicUnderscore: /_([^_]+)_/,
         underline: /\[([^\]]+)\]\{\.underline\}/,
         smallCapsAttr: /\[([^\]]+)\]\{\.smallcaps\}/,
-        superscript: /\^([^^\r]+)\^/,
-        subscript: /~([^~]+)~/,
+        superscript: /\^([^^\r\]]+)\^/,
         footnoteRef: /\[\^([a-zA-Z0-9_-]+)\]/,
         footnoteDefinition: /^\[\^([^\]]+)\]:\s*(.+)/,
         lineBreaks: /\r\r+/,
         backslash: /\\/
     };
+    
+    /**
+     * Escaped characters handling - Global variables
+     */
+    var ESCAPE_SEQUENCES = {
+        '\\\\': '§ESC§BACKSLASH§',      // Literal backslash: \\
+        '\\*': '§ESC§ASTERISK§',        // Asterisk: \* (for italic/bold)
+        '\\#': '§ESC§HASH§',            // Hashtag: \#
+        '\\$': '§ESC§DOLLAR§',          // Dollar: \$
+        "\\'": '§ESC§APOSTROPHE§',      // Apostrophe: \'
+        '\\[': '§ESC§BRACKET§OPEN§',    // Opening bracket: \[
+        '\\]': '§ESC§BRACKET§CLOSE§',   // Closing bracket: \]
+        '\\^': '§ESC§CIRCUMFLEX§',      // Circumflex: \^
+        '\\_': '§ESC§UNDERSCORE§',      // Underscore: \_
+        '\\`': '§ESC§BACKTICK§',        // Backtick: \`
+        '\\|': '§ESC§PIPE§',            // Pipe: \|
+        '\\~': '§ESC§TILDE§'            // Tilde: \~
+    };
+    
+    // Reverse mapping for restoration
+    var RESTORE_SEQUENCES = {};
+    for (var key in ESCAPE_SEQUENCES) {
+        if (ESCAPE_SEQUENCES.hasOwnProperty(key)) {
+            RESTORE_SEQUENCES[ESCAPE_SEQUENCES[key]] = key.substring(1); // Remove backslash prefix
+        }
+    }
+    
+    /**
+     * Protects escaped characters before Markdown processing
+     * @param {string} text - The text to process
+     * @return {string} Text with escaped characters protected
+     * @private
+     */
+    function protectEscapedCharacters(text) {
+        var result = text;
+        
+        // Process \\ first to avoid conflicts
+        if (result.indexOf('\\\\') !== -1) {
+            var parts = result.split('\\\\');
+            result = parts.join(ESCAPE_SEQUENCES['\\\\']);
+        }
+        
+        // Process other escape sequences
+        for (var escaped in ESCAPE_SEQUENCES) {
+            if (ESCAPE_SEQUENCES.hasOwnProperty(escaped) && escaped !== '\\\\') {
+                if (result.indexOf(escaped) !== -1) {
+                    var parts = result.split(escaped);
+                    result = parts.join(ESCAPE_SEQUENCES[escaped]);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Restores escaped characters in the main text
+     * @param {Story} target - The InDesign story to process
+     * @private
+     */
+    function restoreEscapedCharacters(target) {
+        try {
+            // Save current options
+            var oldIncludeFootnotes = app.findChangeTextOptions.includeFootnotes;
+            var oldIncludeMasterPages = app.findChangeTextOptions.includeMasterPages;
+            var oldIncludeHiddenLayers = app.findChangeTextOptions.includeHiddenLayers;
+            
+            // Configure search (exclude footnotes here)
+            app.findChangeTextOptions.includeFootnotes = false;
+            app.findChangeTextOptions.includeMasterPages = false;
+            app.findChangeTextOptions.includeHiddenLayers = false;
+            
+            // Check which placeholders exist
+            var textContent = target.contents;
+            var placeholdersToRestore = [];
+            
+            for (var placeholder in RESTORE_SEQUENCES) {
+                if (RESTORE_SEQUENCES.hasOwnProperty(placeholder)) {
+                    if (textContent.indexOf(placeholder) !== -1) {
+                        placeholdersToRestore.push({
+                            find: placeholder,
+                            replace: RESTORE_SEQUENCES[placeholder]
+                        });
+                    }
+                }
+            }
+            
+            // Restore only present placeholders
+            if (placeholdersToRestore.length > 0) {
+                $.writeln("Restoring " + placeholdersToRestore.length + " escape sequences...");
+                
+                for (var i = 0; i < placeholdersToRestore.length; i++) {
+                    var mapping = placeholdersToRestore[i];
+                    
+                    // Clear preferences
+                    app.findTextPreferences = app.changeTextPreferences = null;
+                    app.findTextPreferences.findWhat = mapping.find;
+                    app.changeTextPreferences.changeTo = mapping.replace;
+                    
+                    // Execute replacement
+                    var foundItems = target.changeText();
+                    $.writeln("Replaced " + foundItems.length + " instances of: " + mapping.find);
+                }
+            }
+            
+            // Restore options
+            app.findChangeTextOptions.includeFootnotes = oldIncludeFootnotes;
+            app.findChangeTextOptions.includeMasterPages = oldIncludeMasterPages;
+            app.findChangeTextOptions.includeHiddenLayers = oldIncludeHiddenLayers;
+            
+            // Clear preferences
+            app.findTextPreferences = app.changeTextPreferences = null;
+            
+        } catch (e) {
+            $.writeln("Error in restoreEscapedCharacters: " + e.message);
+            app.findTextPreferences = app.changeTextPreferences = null;
+            throw new Error("Failed to restore escaped characters: " + e.message);
+        }
+    }
+    
+    /**
+     * Restores escaped characters in footnotes
+     * @private
+     */
+    function restoreEscapedCharactersInFootnotes() {
+        try {
+            // Check if there are footnotes
+            var allStories = app.activeDocument.stories.everyItem().getElements();
+            var hasFootnotes = false;
+            var allFootnoteContent = "";
+            
+            for (var i = 0; i < allStories.length; i++) {
+                try {
+                    var footnotes = allStories[i].footnotes.everyItem().getElements();
+                    if (footnotes.length > 0) {
+                        hasFootnotes = true;
+                        for (var j = 0; j < footnotes.length; j++) {
+                            allFootnoteContent += footnotes[j].texts[0].contents;
+                        }
+                    }
+                } catch(e) {
+                    // Ignore errors
+                }
+            }
+            
+            if (!hasFootnotes) {
+                return;
+            }
+            
+            // Save options
+            var oldIncludeFootnotes = app.findChangeTextOptions.includeFootnotes;
+            var oldIncludeMasterPages = app.findChangeTextOptions.includeMasterPages;
+            var oldIncludeHiddenLayers = app.findChangeTextOptions.includeHiddenLayers;
+            
+            // Search ONLY in footnotes
+            app.findChangeTextOptions.includeFootnotes = true;
+            app.findChangeTextOptions.includeMasterPages = false;
+            app.findChangeTextOptions.includeHiddenLayers = false;
+            
+            // Check placeholders present in footnotes
+            var placeholdersToRestore = [];
+            for (var placeholder in RESTORE_SEQUENCES) {
+                if (RESTORE_SEQUENCES.hasOwnProperty(placeholder)) {
+                    if (allFootnoteContent.indexOf(placeholder) !== -1) {
+                        placeholdersToRestore.push({
+                            find: placeholder,
+                            replace: RESTORE_SEQUENCES[placeholder]
+                        });
+                    }
+                }
+            }
+            
+            if (placeholdersToRestore.length > 0) {
+                $.writeln("Restoring " + placeholdersToRestore.length + " escape sequences in footnotes...");
+                
+                for (var i = 0; i < placeholdersToRestore.length; i++) {
+                    var mapping = placeholdersToRestore[i];
+                    
+                    app.findTextPreferences = app.changeTextPreferences = null;
+                    app.findTextPreferences.findWhat = mapping.find;
+                    app.changeTextPreferences.changeTo = mapping.replace;
+                    
+                    app.activeDocument.changeText();
+                }
+            }
+            
+            // Restore options
+            app.findChangeTextOptions.includeFootnotes = oldIncludeFootnotes;
+            app.findChangeTextOptions.includeMasterPages = oldIncludeMasterPages;
+            app.findChangeTextOptions.includeHiddenLayers = oldIncludeHiddenLayers;
+            
+            app.findTextPreferences = app.changeTextPreferences = null;
+            
+        } catch (e) {
+            $.writeln("Error in restoreEscapedCharactersInFootnotes: " + e.message);
+            app.findTextPreferences = app.changeTextPreferences = null;
+        }
+    }
     
     /**
      * Predefined style names in different languages
@@ -819,12 +1016,17 @@ var MarkdownImport = (function() {
     }
     
     /**
-     * Reset all styles to normal
+     * Reset all styles to normal and protect escaped characters
      * @param {Story} target - The story to modify
      * @param {Object} styleMapping - Style mapping configuration
      */
     function resetStyles(target, styleMapping) {
         try {
+            // CRITICAL: Protect escaped characters BEFORE any other processing
+            var protectedText = protectEscapedCharacters(target.contents);
+            target.contents = protectedText;
+            
+            // Reset paragraph styles
             app.findTextPreferences = app.changeTextPreferences = null;
             target.texts[0].appliedParagraphStyle = styleMapping.normal;
         } catch (e) {
@@ -898,15 +1100,88 @@ var MarkdownImport = (function() {
                 { regex: REGEX.italicUnderscore, style: styleMapping.italic },
                 { regex: REGEX.underline, style: styleMapping.underline },
                 { regex: REGEX.smallCapsAttr, style: styleMapping.smallcaps },
-                { regex: REGEX.subscript, style: styleMapping.subscript },
                 { regex: REGEX.superscript, style: styleMapping.superscript }
             ];
             for (var i = 0; i < cMap.length; i++) {
                 applyCharStyle(target, cMap[i].regex, cMap[i].style);
             }
+            // Apply special character styles (subscript)
+            applySpecialCharacterStyles(target, styleMapping);
         } catch (e) {
             $.writeln("Error in applyCharacterStyles: " + e.message);
             throw new Error("Failed to apply character styles: " + e.message);
+        }
+    }
+    
+    /**
+     * Apply character styles for special characters incompatible with InDesign GREP
+     * @param {Story} target - The story to modify  
+     * @param {Object} styleMapping - Style mapping configuration
+     * @private
+     */
+    function applySpecialCharacterStyles(target, styleMapping) {
+        // Subscript: ~text~ (tilde is reserved in InDesign GREP engine)
+        applySubscriptStyle(target, styleMapping.subscript);
+        
+        // Future special cases can be added here as needed
+    }
+    
+    /**
+     * Apply subscript style using findText (workaround for InDesign GREP limitation)
+     * Processes ~text~ patterns and applies subscript character style
+     * @param {Story} target - The story to modify
+     * @param {CharacterStyle} style - The subscript style to apply
+     * @private
+     */
+    function applySubscriptStyle(target, style) {
+        try {
+            app.findTextPreferences = app.changeTextPreferences = null;
+            app.findTextPreferences.findWhat = "~";
+            var tildeMatches = target.findText();
+            
+            if (tildeMatches.length < 2) return;
+            
+            var processedPairs = 0;
+            var pairsToProcess = Math.floor(tildeMatches.length / 2);
+            
+            for (var pairIndex = pairsToProcess - 1; pairIndex >= 0; pairIndex--) {
+                var startIdx = pairIndex * 2;
+                var endIdx = startIdx + 1;
+                
+                try {
+                    var startTilde = tildeMatches[startIdx];
+                    var endTilde = tildeMatches[endIdx];
+                    
+                    if (!startTilde.isValid || !endTilde.isValid) continue;
+                    if (startTilde.paragraphs[0] !== endTilde.paragraphs[0]) continue;
+                    
+                    var story = startTilde.parentStory;
+                    var startIndex = startTilde.index;
+                    var endIndex = endTilde.index;
+                    
+                    if (endIndex > startIndex + 1) {
+                        var subscriptRange = story.characters.itemByRange(startIndex + 1, endIndex - 1);
+                        if (style && subscriptRange.isValid) {
+                            subscriptRange.appliedCharacterStyle = style;
+                        }
+                        endTilde.remove();
+                        startTilde.remove();
+                        processedPairs++;
+                    }
+                } catch (e) {
+                    $.writeln("Error processing subscript pair: " + e.message);
+                }
+            }
+            
+            if (processedPairs > 0) {
+                $.writeln("Subscript: " + processedPairs + " pair(s) processed");
+            }
+            
+        } catch (e) {
+            $.writeln("Error in applySubscriptStyle: " + e.message);
+            throw new Error("Failed to apply subscript style: " + e.message);
+        } finally {
+            app.findTextPreferences = app.changeTextPreferences = null;
         }
     }
     
@@ -950,23 +1225,45 @@ var MarkdownImport = (function() {
     }
     
     /**
-     * Process footnotes in the document
-     * @param {Story} target - The story to modify
-     * @param {Object} styleMapping - Style mapping configuration
-     */
+    * Process footnotes in the document - Minimal safe version
+    * @param {Story} target - The story to modify
+    * @param {Object} styleMapping - Style mapping configuration
+    */
     function processFootnotes(target, styleMapping) {
         try {
             // Collect definitions [^id]: text
             var notes = {};
             var paras = target.paragraphs;
+            
+            // Log at start
+            try {
+                logToFile("Processing footnotes - examining " + paras.length + " paragraphs", false);
+            } catch(e) {}
+            
             for (var i = paras.length-1; i >= 0; i--) {
-                var line = paras[i].contents.replace(/\r$/, "");
-                var m = line.match(REGEX.footnoteDefinition);
-                if (m) {
-                    notes[m[1]] = m[2];
-                    paras[i].remove();
+                try {
+                    var line = paras[i].contents.replace(/\r$/, "");
+                    var m = line.match(REGEX.footnoteDefinition);
+                    if (m) {
+                        notes[m[1]] = m[2];
+                        logToFile("Found footnote definition: [" + m[1] + "]", false);
+                        paras[i].remove();
+                    }
+                } catch(paraError) {
+                    logToFile("Error processing paragraph " + i + ": " + paraError.message, true);
+                    continue;
                 }
             }
+    
+            // Count collected definitions
+            var definitionCount = 0;
+            for (var noteId in notes) {
+                if (notes.hasOwnProperty(noteId)) definitionCount++;
+            }
+            
+            try {
+                logToFile("Collected " + definitionCount + " footnote definitions", false);
+            } catch(e) {}
     
             // Search for footnote references
             app.findGrepPreferences = app.changeGrepPreferences = null;
@@ -975,48 +1272,102 @@ var MarkdownImport = (function() {
     
             // Count total and update progress info for detailed feedback
             var totalFootnotes = calls.length;
+            var notesCreated = 0;
+            
+            try {
+                logToFile("Found " + totalFootnotes + " footnote references", false);
+            } catch(e) {}
             
             // Reverse traversal to avoid index shifting
             for (var i = calls.length-1; i >= 0; i--) {
-                // Update progress for footnotes (within the same step)
+                // Update progress info for footnotes (within the same step)
                 if (totalFootnotes > 10) { // Only show detailed progress for many footnotes
                     updateProgressBar(4, "Processing footnotes... (" + (calls.length - i) + "/" + totalFootnotes + ")");
                 }
                 
                 var t = calls[i];
-                var idMatch = t.contents.match(REGEX.footnoteRef);
-                if (!idMatch) continue;
-                var id = idMatch[1];
-                if (!notes.hasOwnProperty(id)) continue;
-    
-                var story = t.parentStory;
-                var idxPos = t.insertionPoints[0].index;
-                t.remove();
-    
-                // Find appropriate insertion point for footnote
-                var anchor = idxPos - 1;
-                while (anchor >= 0) {
-                    var ch = story.characters[anchor].contents;
-                    if (String(ch).match(/[A-Za-zÀ-ÿ0-9]/)) break;
-                    anchor--;
-                }
-                anchor++;
                 
-                // Handle diacritics
-                while (anchor < story.characters.length) {
-                    var code = String(story.characters[anchor].contents).charCodeAt(0);
-                    if (code >= 0x0300 && code <= 0x036F) anchor++;
-                    else break;
-                }
+                try {
+                    var idMatch = t.contents.match(REGEX.footnoteRef);
+                    if (!idMatch) continue;
+                    var id = idMatch[1];
+                    if (!notes.hasOwnProperty(id)) {
+                        logToFile("No definition found for footnote: " + id, true);
+                        continue;
+                    }
     
-                // Insert footnote
-                var fn = story.insertionPoints[anchor].footnotes.add();
-                fn.insertionPoints[-1].contents = notes[id];
-                if (styleMapping.note) fn.paragraphs[0].appliedParagraphStyle = styleMapping.note;
+                    var story = t.parentStory;
+                    var idxPos = t.insertionPoints[0].index;
+                    t.remove();
+    
+                    // Find appropriate insertion point for footnote
+                    var anchor = idxPos - 1;
+                    while (anchor >= 0) {
+                        try {
+                            var ch = story.characters[anchor].contents;
+                            if (String(ch).match(/[A-Za-zÀ-ÿ0-9]/)) break;
+                        } catch(charError) {
+                            // If character cannot be read, stop here
+                            break;
+                        }
+                        anchor--;
+                    }
+                    anchor++;
+                    
+                    // Handle diacritics
+                    while (anchor < story.characters.length) {
+                        try {
+                            var code = String(story.characters[anchor].contents).charCodeAt(0);
+                            if (code >= 0x0300 && code <= 0x036F) anchor++;
+                            else break;
+                        } catch(diacriticError) {
+                            // If error, exit loop
+                            break;
+                        }
+                    }
+    
+                    // Insert footnote with safety checks
+                    try {
+                        var fn = story.insertionPoints[anchor].footnotes.add();
+                        fn.insertionPoints[-1].contents = notes[id];
+                        
+                        // Apply style if available
+                        if (styleMapping.note && fn.paragraphs.length > 0) {
+                            try {
+                                fn.paragraphs[0].appliedParagraphStyle = styleMapping.note;
+                            } catch(styleError) {
+                                logToFile("Error applying footnote style: " + styleError.message, true);
+                            }
+                        }
+                        
+                        notesCreated++;
+                        
+                    } catch(insertError) {
+                        logToFile("Error inserting footnote " + id + ": " + insertError.message, true);
+                    }
+                    
+                } catch(footnoteError) {
+                    logToFile("Error processing footnote reference: " + footnoteError.message, true);
+                    continue;
+                }
             }
+            
+            try {
+                logToFile("Footnotes created: " + notesCreated + "/" + totalFootnotes, false);
+            } catch(e) {}
+            
         } catch (e) {
-            $.writeln("Error in processFootnotes: " + e.message);
+            try {
+                logToFile("Critical error in processFootnotes: " + e.message, true);
+            } catch(logError) {
+                // If logging fails, nothing else can be done
+            }
             throw new Error("Failed to process footnotes: " + e.message);
+        } finally {
+            // Always reset preferences
+            try {
+                app.findGrepPreferences = app.changeGrepPreferences = null;
+            } catch(e) {}
         }
     }
     
@@ -1117,13 +1468,13 @@ var MarkdownImport = (function() {
     }
     
     /**
-     * Clean up text - remove multiple line breaks and escape characters
+     * Clean up text and restore escaped characters
      * @param {Story} target - The story to modify
      */
     function cleanupText(target) {
         try {
             var oldOpt = app.findChangeGrepOptions.includeFootnotes;
-            app.findChangeGrepOptions.includeFootnotes = true;
+            app.findChangeGrepOptions.includeFootnotes = false; // Don't include footnotes here
     
             // Replace multiple line breaks with single one
             app.findGrepPreferences = app.changeGrepPreferences = null;
@@ -1131,19 +1482,17 @@ var MarkdownImport = (function() {
             app.changeGrepPreferences.changeTo = "\\r";
             target.changeGrep();
     
-            // Remove backslashes (escape characters)
-            app.findGrepPreferences = app.changeGrepPreferences = null;
-            app.findGrepPreferences.findWhat = REGEX.backslash.source;
-            app.changeGrepPreferences.changeTo = "";
-            target.changeGrep();
-            
             // Convert double hyphens to em dash
             app.findGrepPreferences = app.changeGrepPreferences = null;
             app.findGrepPreferences.findWhat = "\\x{2013}-";
             app.changeGrepPreferences.changeTo = "\\x{2014}";
             target.changeGrep();
     
-            app.findChangeGrepOptions.includeFootnotes = oldOpt; // restore original setting
+            app.findChangeGrepOptions.includeFootnotes = oldOpt;
+            
+            // CRITICAL: Restore escaped characters using find/replace (preserves formatting)
+            restoreEscapedCharacters(target);
+            
         } catch (e) {
             $.writeln("Error in cleanupText: " + e.message);
             throw new Error("Failed to clean up text: " + e.message);
@@ -1718,6 +2067,7 @@ var MarkdownImport = (function() {
                         processFootnotes(target, styleMapping);
                         cleanupText(target);
                         processFootnoteStyles(styleMapping);
+                        restoreEscapedCharactersInFootnotes();
                         
                         // Ajouter la suppression des pages blanches si configurée
                         if (styleMapping && styleMapping.removeBlankPages) {
@@ -1751,7 +2101,7 @@ var MarkdownImport = (function() {
             // Check if user canceled the dialog
             if (styleMapping) {
                 // Create progress bar
-                createProgressBar(10);
+                createProgressBar(11);
                 
                 try {
                     // Wrap the core operations in a transaction
@@ -1784,11 +2134,15 @@ var MarkdownImport = (function() {
                         updateProgressBar(8, I18n.__("processingFootnoteStyles"));
                         processFootnoteStyles(styleMapping);
                         
+                        // Restore escaped characters in footnotes
+                        updateProgressBar(9, "Restoring escaped characters in footnotes...");
+                        restoreEscapedCharactersInFootnotes();
+                        
                         // À l'intérieur de la fonction main, après le traitement des styles
                         if (styleMapping && styleMapping.removeBlankPages) {
                             try {
                                 // Mettre à jour la barre de progression
-                                updateProgressBar(9, I18n.__("removingBlankPages"));
+                                updateProgressBar(10, I18n.__("removingBlankPages"));
                                 
                                 // Supprimer les pages blanches
                                 var pagesRemoved = removeBlankPagesAfterTextEnd(doc);
@@ -1796,19 +2150,19 @@ var MarkdownImport = (function() {
                                 // Ajouter l'information au message de fin si des pages ont été supprimées
                                 if (pagesRemoved > 0) {
                                     var pagesRemovedText = I18n.__("pagesRemoved", pagesRemoved);
-                                    updateProgressBar(10, I18n.__("done") + " " + pagesRemovedText);
+                                    updateProgressBar(11, I18n.__("done") + " " + pagesRemovedText);
                                 } else {
-                                    updateProgressBar(10, I18n.__("done"));
+                                    updateProgressBar(11, I18n.__("done"));
                                 }
                             } catch (e) {
                                 $.writeln("Error while removing blank pages: " + e.message);
                                 // Continuer même en cas d'erreur
-                                updateProgressBar(10, I18n.__("done"));
+                                updateProgressBar(11, I18n.__("done"));
                             }
                             
                         // Complete!
                         } else {
-                            updateProgressBar(10, I18n.__("done"));
+                            updateProgressBar(11, I18n.__("done"));
                         }
                     }, ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Markdown Import");
                 } finally {
