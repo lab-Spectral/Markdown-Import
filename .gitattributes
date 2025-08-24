@@ -1,1 +1,2 @@
-docs export-ignore
+docs/           export-ignore
+CONTRIBUTING.md export-ignore
