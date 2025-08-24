@@ -5,7 +5,7 @@
  * replacing Markdown tags with corresponding paragraph and character styles,
  * and converting Markdown footnotes into real InDesign footnotes.
  * 
- * @version 1.0 beta 9
+ * @version 1.0 beta 10
  * @license MIT
  * @author entremonde / Spectral lab
  * @website http://lab.spectral.art
@@ -14,7 +14,7 @@
 // Create a namespace to avoid polluting global scope
 var MarkdownImport = (function() {
     "use strict";
-    var VERSION = "1.0b9";
+    var VERSION = "1.0b10";
     
     // Set to true to enable logging in silent mode
     var enableLogging = false;
@@ -1225,13 +1225,13 @@ var MarkdownImport = (function() {
     }
     
     /**
-    * Process footnotes in the document - Minimal safe version
-    * @param {Story} target - The story to modify
-    * @param {Object} styleMapping - Style mapping configuration
-    */
+     * Process footnotes in the document - Enhanced for multi-paragraph support
+     * @param {Story} target - The story to modify
+     * @param {Object} styleMapping - Style mapping configuration
+     */
     function processFootnotes(target, styleMapping) {
         try {
-            // Collect definitions [^id]: text
+            // Collect definitions [^id]: text (now with multi-paragraph support)
             var notes = {};
             var paras = target.paragraphs;
             
@@ -1245,9 +1245,48 @@ var MarkdownImport = (function() {
                     var line = paras[i].contents.replace(/\r$/, "");
                     var m = line.match(REGEX.footnoteDefinition);
                     if (m) {
-                        notes[m[1]] = m[2];
-                        logToFile("Found footnote definition: [" + m[1] + "]", false);
-                        paras[i].remove();
+                        var footnoteId = m[1];
+                        var footnoteContent = m[2];
+                        
+                        logToFile("Found footnote definition: [" + footnoteId + "]", false);
+                        
+                        // Look ahead for consecutive lines that are part of this footnote
+                        var paragraphsToRemove = [i]; // Track which paragraphs to remove
+                        var j = i + 1;
+                        
+                        while (j < paras.length) {
+                            try {
+                                var nextLine = paras[j].contents.replace(/\r$/, "");
+                                
+                                // Stop only if we hit another footnote definition
+                                if (nextLine.match(REGEX.footnoteDefinition)) {
+                                    break;
+                                }
+                                
+                                // Add to current footnote content
+                                footnoteContent += "\r" + nextLine;
+                                paragraphsToRemove.push(j); // Add to removal list
+                                j++;
+                                
+                            } catch(nextParaError) {
+                                logToFile("Error checking next paragraph: " + nextParaError.message, true);
+                                break;
+                            }
+                        }
+                        
+                        // Trim trailing empty lines
+                        footnoteContent = footnoteContent.replace(/(\r\s*)+$/, "");
+                        
+                        notes[footnoteId] = footnoteContent;
+                        
+                        // Remove all paragraphs belonging to this footnote (in reverse order)
+                        for (var k = paragraphsToRemove.length - 1; k >= 0; k--) {
+                            try {
+                                paras[paragraphsToRemove[k]].remove();
+                            } catch(removeError) {
+                                logToFile("Error removing paragraph: " + removeError.message, true);
+                            }
+                        }
                     }
                 } catch(paraError) {
                     logToFile("Error processing paragraph " + i + ": " + paraError.message, true);
@@ -1255,6 +1294,8 @@ var MarkdownImport = (function() {
                 }
             }
     
+            // ========= TOUT LE RESTE RESTE IDENTIQUE À L'ORIGINAL =========
+            
             // Count collected definitions
             var definitionCount = 0;
             for (var noteId in notes) {
@@ -1281,7 +1322,7 @@ var MarkdownImport = (function() {
             // Reverse traversal to avoid index shifting
             for (var i = calls.length-1; i >= 0; i--) {
                 // Update progress info for footnotes (within the same step)
-                if (totalFootnotes > 10) { // Only show detailed progress for many footnotes
+                if (totalFootnotes > 10) {
                     updateProgressBar(4, "Processing footnotes... (" + (calls.length - i) + "/" + totalFootnotes + ")");
                 }
                 
