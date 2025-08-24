@@ -67,8 +67,8 @@ Adobe InDesign CS6 or newer (macOS/Windows)
 	
 	"italic":"Italic",
 	"bold":"Bold",
-	"bolditalic":Bold italic,
-	"underline":Underline,
+	"bolditalic":"Bold italic",
+	"underline":"Underline",
 	"smallcaps":"Small caps",
 	"subscript":"Subscript",
 	"superscript":"Superscript",
