@@ -9,6 +9,7 @@ This script for Adobe InDesign automatically imports and transforms a Markdown t
 
 #### Requirements
 Adobe InDesign CS6 or newer (macOS/Windows)
+
 ➡️ [Download latest release](https://github.com/lab-Spectral/Markdown-Import/releases/latest)
 
 
