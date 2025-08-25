@@ -383,7 +383,7 @@ var MarkdownImport = (function() {
         underline: /\[([^\]]+)\]\{\.underline\}/,
         smallCapsAttr: /\[([^\]]+)\]\{\.smallcaps\}/,
         superscript: /\^([^^\r\]]+)\^/,
-        footnoteRef: /\[\^([a-zA-Z0-9_-]+)\]/,
+        footnoteRef: /\[\^([^\]]+)\]/,
         footnoteDefinition: /^\[\^([^\]]+)\]:\s*(.+)/,
         lineBreaks: /\r\r+/,
         backslash: /\\/
