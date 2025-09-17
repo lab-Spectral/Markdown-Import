@@ -160,7 +160,7 @@ The script chooses the target story in this order:
 
 * Collapse **multiple line breaks** to a single paragraph break
 * Convert `--` to an **en-dash** (–)
-* Convert `---` or `–-` to an **em-dash** (—)
+* Convert `–-` to an **em-dash** (—)
 * Convert Markdown hard breaks (two spaces + return) to line breaks
 * Optional: **remove blank pages** after the actual end of the imported story; in facing-pages documents, add a page if needed to keep spreads aligned
 
