@@ -42,7 +42,7 @@ Adobe InDesign CS6 ou plus récent (macOS/Windows)
 
 ## Installation
 
-1. Téléchargez `Markdown-Import_v1.0b12a.jsx`.
+1. Téléchargez `Markdown-Import.jsx`.
 2. Dans InDesign, ouvrez **Fenêtre → Utilitaires → Scripts**.
 3. Clic droit sur **Utilisateur** → **Révéler dans le Finder/Explorer**, puis déposez le `.jsx` dans le dossier ouvert.
 4. Double-cliquez sur le script dans le panneau **Scripts** pour l’exécuter.
