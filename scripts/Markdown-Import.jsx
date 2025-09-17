@@ -5,7 +5,7 @@
  * replacing Markdown tags with corresponding paragraph and character styles,
  * and converting Markdown footnotes into real InDesign footnotes.
  * 
- * @version 1.0 beta 10
+ * @version 1.0 beta 11
  * @license MIT
  * @author entremonde / Spectral lab
  * @website http://lab.spectral.art
@@ -14,7 +14,7 @@
 // Create a namespace to avoid polluting global scope
 var MarkdownImport = (function() {
     "use strict";
-    var VERSION = "1.0b10";
+    var VERSION = "1.0b11";
     
     // Set to true to enable logging in silent mode
     var enableLogging = false;
@@ -65,6 +65,7 @@ var MarkdownImport = (function() {
                 'smallcaps': 'Small Caps',
                 'subscript': 'Subscript',
                 'superscript': 'Superscript',
+                'strikethrough': 'Strikethrough',
                 
                 // Footnote style
                 'footnoteStyle': 'Footnote style',
@@ -80,6 +81,21 @@ var MarkdownImport = (function() {
                 'resettingStyles': 'Resetting styles...',
                 'applyingParagraphStyles': 'Applying paragraph styles...',
                 'applyingCharacterStyles': 'Applying character styles...',
+                'processingPandocAttributes': 'Processing Pandoc attributes...',
+                'processingImages': 'Processing images...',
+                'imageConfiguration': 'Images',
+                'aspectRatio': 'Aspect Ratio',
+                'freeRatio': 'Free (auto)',
+                'imageStyle': 'Image Style',
+                'imageObjectStyle': 'Object style:',
+                'captionSettings': 'Caption Settings', 
+                'captionObjectStyle': 'Frame style:',
+                'captionParagraphStyle': 'Text style:',
+                'captionGap': 'Gap (pt):',
+                'captionMaxHeight': 'Max height (pt):',
+                'selectImageFolder': 'Select image folder',
+                'imageNotFound': 'Image not found: %s',
+                'errorProcessingImage': 'Error processing image: %s',
                 'processingFootnotes': 'Processing footnotes...',
                 'processingFootnoteStyles': 'Processing footnote styles...',
                 'cleaningUpText': 'Cleaning up text...',
@@ -101,7 +117,13 @@ var MarkdownImport = (function() {
                 'errorOpeningConfigFile': 'Could not open configuration file: %s',
                 'errorInLoadConfig': 'Error in loadConfiguration: %s',
                 'genericError': 'Error: %s\nLine: %s',
-                'pagesRemoved': '(%d pages removed)'
+                'pagesRemoved': '(%d pages removed)',
+                'tables': 'Tables',
+                'tableConfiguration': 'Table Configuration', 
+                'processTablesEnabled': 'Process Markdown tables',
+                'tableStyle': 'Table style:',
+                'useTableAlignment': 'Use Markdown alignment (:--- | :---: | ---:)',
+                'tablesProcessed': '%d table(s) processed'
             },
             'fr': {
                 // Interface principale
@@ -139,6 +161,7 @@ var MarkdownImport = (function() {
                 'smallcaps': 'Petites capitales',
                 'subscript': 'Indice',
                 'superscript': 'Exposant',
+                'strikethrough': 'Barr\u00E9',
                 
                 // Style de note de bas de page
                 'footnoteStyle': 'Style de note de bas de page',
@@ -154,6 +177,21 @@ var MarkdownImport = (function() {
                 'resettingStyles': 'R\u00E9initialisation des styles...',
                 'applyingParagraphStyles': 'Application des styles de paragraphe...',
                 'applyingCharacterStyles': 'Application des styles de caract\u00E8re...',
+                'processingPandocAttributes': 'Traitement des attributs Pandoc...',
+                'processingImages': 'Traitement des images...',
+                'imageConfiguration': 'Images',
+                'aspectRatio': 'Format d\'image',
+                'freeRatio': 'Libre (auto)',
+                'imageStyle': 'Style d\'image',
+                'imageObjectStyle': 'Style d\'objet :',
+                'captionSettings': 'Style de l\u00E9gende',
+                'captionObjectStyle': 'Style d\'objet :',
+                'captionParagraphStyle': 'Style de texte :',
+                'captionGap': '\u00C9cart avec l\'image (pt) :',
+                'captionMaxHeight': 'Hauteur max du bloc (pt) :',
+                'selectImageFolder': 'Choisir dossier images',
+                'imageNotFound': 'Image introuvable : %s',
+                'errorProcessingImage': 'Erreur traitement image : %s',
                 'processingFootnotes': 'Traitement des notes de bas de page...',
                 'processingFootnoteStyles': 'Traitement des styles de notes de bas de page...',
                 'cleaningUpText': 'Nettoyage du texte...',
@@ -175,7 +213,13 @@ var MarkdownImport = (function() {
                 'errorOpeningConfigFile': 'Impossible d\'ouvrir le fichier de configuration : %s',
                 'errorInLoadConfig': 'Erreur dans loadConfiguration : %s',
                 'genericError': 'Erreur : %s\nLigne : %s',
-                'pagesRemoved': '(%d pages supprimées)' 
+                'pagesRemoved': '(%d pages supprim\u00E9es)',
+                'tables': 'Tableaux',
+                'tableConfiguration': 'Configuration des tableaux',
+                'processTablesEnabled': 'Traiter les tableaux Markdown',
+                'tableStyle': 'Style de tableau :',
+                'useTableAlignment': 'Utiliser l\'alignement Markdown (:--- | :---: | ---:)',
+                'tablesProcessed': '%d tableau(x) trait\u00E9(s)'
             }
         };
         
@@ -368,7 +412,7 @@ var MarkdownImport = (function() {
         h4: /^#### (.+)/,
         h5: /^##### (.+)/,
         h6: /^###### (.+)/,
-        quote: /^>[ \t]?(.+)/,
+        quote: /^>[ \t]?(.*)/,
         bulletlist: /^[-*+] (.+)/,
         boldItalic: /\*\*\*([^\*]+)\*\*\*/,
         boldItalicUnderscore: /___([^_]+)___/,
@@ -383,10 +427,14 @@ var MarkdownImport = (function() {
         underline: /\[([^\]]+)\]\{\.underline\}/,
         smallCapsAttr: /\[([^\]]+)\]\{\.smallcaps\}/,
         superscript: /\^([^^\r\]]+)\^/,
+        strikethrough: /~~([^~]+)~~/,
         footnoteRef: /\[\^([^\]]+)\]/,
         footnoteDefinition: /^\[\^([^\]]+)\]:\s*(.+)/,
         lineBreaks: /\r\r+/,
-        backslash: /\\/
+        backslash: /\\/,
+        pandocInline: /\[([^\]]+)\]\{([^}]+)\}/,
+        pandocFenceOpen: /^:::\s*\{([^}]*)\}\s*$/,
+        pandocFenceClose: /^:::\s*$/
     };
     
     /**
@@ -586,6 +634,333 @@ var MarkdownImport = (function() {
             app.findTextPreferences = app.changeTextPreferences = null;
         }
     }
+   
+    /**
+     * Split a table row into cells, handling escaped pipes and code spans
+     * @param {String} line - Raw table row line
+     * @return {Array} Array of cell contents
+     * @private
+     */
+    function splitTableRow(line) {
+        // Strip outer pipes: | a | b |
+        line = String(line).replace(/^\s*\|/, "").replace(/\|\s*$/, "");
+        var out = [], buf = "", i = 0, inCode = false, ch = "";
+        
+        while (i < line.length) {
+            ch = line.charAt(i);
+            
+            // Handle escape sequences: only \|, \`, \\ are special
+            if (ch === "\\") {
+                var next = (i + 1 < line.length) ? line.charAt(i + 1) : "";
+                if (next === "|" || next === "`" || next === "\\") {
+                    buf += next;
+                    i += 2;
+                    continue;
+                }
+                // Literal backslash
+                buf += "\\";
+                i++;
+                continue;
+            }
+            
+            // Toggle code span state
+            if (ch === "`") {
+                inCode = !inCode;
+                buf += ch;
+                i++;
+                continue;
+            }
+            
+            // Split on pipe only if not in code span
+            if (ch === "|" && !inCode) {
+                out.push(buf.replace(/^\s+|\s+$/g, "")); // trim
+                buf = "";
+                i++;
+                continue;
+            }
+            
+            buf += ch;
+            i++;
+        }
+        
+        out.push(buf.replace(/^\s+|\s+$/g, "")); // trim last cell
+        return out;
+    }
+    
+    /**
+     * Check if a line is a table alignment ruler
+     * @param {String} line - Line to check
+     * @return {Boolean} True if line is a ruler
+     * @private
+     */
+    function isTableRuler(line) {
+        var cells = splitTableRow(line);
+        if (cells.length < 1) return false;
+        
+        for (var i = 0; i < cells.length; i++) {
+            var cleaned = String(cells[i]).replace(/\s+/g, "").replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
+            // Must be at least 2 dashes, optionally preceded/followed by colons
+            if (!/^:?[-\u2013\u2014]{2,}:?$/.test(cleaned)) return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Get alignment from a ruler cell
+     * @param {String} cell - Ruler cell content
+     * @return {String} Alignment: "left", "center", or "right"
+     * @private
+     */
+    function getTableAlignment(cell) {
+        var cleaned = String(cell).replace(/\s+/g, "").replace(/[\u200B\u200C\u200D\uFEFF]/g, "");
+        var hasLeftColon = cleaned.length > 0 && cleaned.charAt(0) === ":";
+        var hasRightColon = cleaned.length > 0 && cleaned.charAt(cleaned.length - 1) === ":";
+        
+        if (hasLeftColon && hasRightColon) return "center";
+        if (hasRightColon) return "right";
+        return "left";
+    }
+    
+    /**
+     * Convert alignment string to InDesign Justification
+     * @param {String} align - Alignment string
+     * @return {Justification} InDesign justification constant
+     * @private
+     */
+    function alignmentToJustification(align) {
+        if (align === "center") return Justification.CENTER_ALIGN;
+        if (align === "right") return Justification.RIGHT_ALIGN;
+        return Justification.LEFT_ALIGN;
+    }
+    
+    /**
+     * Find all Markdown tables in text lines
+     * @param {Array} lines - Array of text lines
+     * @return {Object} Object with tables array and original lines
+     * @private
+     */
+    function findMarkdownTables(lines) {
+        var tables = [];
+        var i = 0;
+        
+        while (i < lines.length - 1) {
+            var currentLine = lines[i];
+            var nextLine = lines[i + 1];
+            
+            // Check if current line has pipes and next line is a ruler
+            if (/\|/.test(currentLine) && isTableRuler(nextLine)) {
+                // Parse table starting at position i
+                var header = splitTableRow(currentLine);
+                var ruler = splitTableRow(nextLine);
+                
+                // Ensure ruler has same number of columns as header
+                while (ruler.length < header.length) {
+                    ruler.push("---");
+                }
+                
+                // Extract alignments from ruler
+                var alignments = [];
+                for (var c = 0; c < header.length; c++) {
+                    alignments.push(getTableAlignment(ruler[c] || "---"));
+                }
+                
+                // Collect body rows
+                var rows = [];
+                var j = i + 2;
+                
+                while (j < lines.length && /\|/.test(lines[j])) {
+                    var lineContent = lines[j].replace(/^\s+|\s+$/g, ""); // trim
+                    if (lineContent === "") break;
+                    
+                    var cells = splitTableRow(lines[j]);
+                    
+                    // Normalize cell count to match header
+                    while (cells.length < header.length) {
+                        cells.push("");
+                    }
+                    if (cells.length > header.length) {
+                        cells = cells.slice(0, header.length);
+                    }
+                    
+                    rows.push(cells);
+                    j++;
+                }
+                
+                tables.push({
+                    start: i,
+                    end: j - 1,
+                    header: header,
+                    alignments: alignments,
+                    rows: rows
+                });
+                
+                i = j; // Continue after this table
+            } else {
+                i++;
+            }
+        }
+        
+        return {
+            tables: tables,
+            lines: lines
+        };
+    }
+    
+    /**
+     * Build an InDesign table from parsed Markdown table data
+     * @param {InsertionPoint} insertionPoint - Where to insert the table
+     * @param {Object} tableData - Parsed table data
+     * @param {Object} config - Table configuration
+     * @return {Table} Created InDesign table
+     * @private
+     */
+    function buildInDesignTable(insertionPoint, tableData, config) {
+        var columnCount = tableData.header.length;
+        var bodyRowCount = tableData.rows.length;
+        
+        try {
+            // Create table with header + body rows
+            var table = insertionPoint.tables.add({
+                bodyRowCount: bodyRowCount,
+                columnCount: columnCount,
+                headerRowCount: 1
+            });
+            
+            // Apply table style if specified
+            if (config.tableStyle) {
+                try {
+                    table.appliedTableStyle = config.tableStyle;
+                } catch (styleError) {
+                    $.writeln("Error applying table style: " + styleError.message);
+                }
+            }
+            
+            // Populate header row
+            for (var c = 0; c < columnCount; c++) {
+                var headerCell = table.rows[0].cells[c];
+                headerCell.contents = tableData.header[c] || "";
+            }
+            
+            // Populate body rows
+            for (var r = 0; r < bodyRowCount; r++) {
+                for (var c2 = 0; c2 < columnCount; c2++) {
+                    var bodyCell = table.rows[r + 1].cells[c2];
+                    bodyCell.contents = tableData.rows[r][c2] || "";
+                }
+            }
+            
+            // Apply column alignments if requested
+            if (config.useAlignment) {
+                for (var col = 0; col < columnCount; col++) {
+                    var justification = alignmentToJustification(tableData.alignments[col]);
+                    
+                    // Apply to all cells in this column
+                    for (var row = 0; row < table.rows.length; row++) {
+                        try {
+                            var cellText = table.rows[row].cells[col].texts[0];
+                            cellText.paragraphs.everyItem().justification = justification;
+                            cellText.justification = justification;
+                        } catch (alignError) {
+                            $.writeln("Error applying alignment to cell: " + alignError.message);
+                        }
+                    }
+                }
+            }
+            
+            // Set equal column widths
+            try {
+                if (columnCount > 0) {
+                    var equalWidth = table.width / columnCount;
+                    for (var k = 0; k < columnCount; k++) {
+                        table.columns[k].width = equalWidth;
+                    }
+                }
+            } catch (widthError) {
+                $.writeln("Error setting column widths: " + widthError.message);
+            }
+            
+            return table;
+            
+        } catch (tableError) {
+            $.writeln("Error creating table: " + tableError.message);
+            throw new Error("Failed to create InDesign table: " + tableError.message);
+        }
+    }
+    
+    /**
+     * Process all Markdown tables in a story
+     * @param {Story} story - InDesign story to process
+     * @param {Object} config - Table processing configuration
+     * @return {Number} Number of tables processed
+     */
+    function processMarkdownTables(story, config) {
+        try {
+            if (!config || !config.processTablesEnabled) {
+                return 0; // Tables processing disabled
+            }
+            
+            var rawText = story.texts[0].contents || "";
+            var normalizedText = String(rawText).replace(/\r\n|\n/g, "\r");
+            var lines = normalizedText.split("\r");
+            
+            var result = findMarkdownTables(lines);
+            
+            if (!result.tables.length) {
+                $.writeln("No Markdown tables found");
+                return 0;
+            }
+            
+            $.writeln("Found " + result.tables.length + " Markdown table(s)");
+            
+            // Process tables in reverse order to preserve character positions
+            for (var i = result.tables.length - 1; i >= 0; i--) {
+                var tableData = result.tables[i];
+                
+                try {
+                    // Calculate absolute character positions
+                    var startPos = 0;
+                    for (var l = 0; l < tableData.start; l++) {
+                        startPos += result.lines[l].length + 1; // +1 for line separator
+                    }
+                    
+                    var endPosExclusive = startPos;
+                    for (var m = tableData.start; m <= tableData.end; m++) {
+                        endPosExclusive += result.lines[m].length;
+                        if (m < tableData.end) {
+                            endPosExclusive += 1; // Add separator between lines
+                        }
+                    }
+                    
+                    // Get insertion point and text range
+                    var insertionPoint = story.insertionPoints[startPos];
+                    var textRange = story.characters.itemByRange(startPos, Math.max(startPos, endPosExclusive - 1));
+                    
+                    // Remove original Markdown table text
+                    try {
+                        textRange.remove();
+                    } catch (removeError) {
+                        try {
+                            textRange.contents = "";
+                        } catch (clearError) {
+                            $.writeln("Error clearing table text: " + clearError.message);
+                        }
+                    }
+                    
+                    // Insert new InDesign table
+                    buildInDesignTable(insertionPoint, tableData, config);
+                    
+                } catch (processError) {
+                    $.writeln("Error processing table " + (i + 1) + ": " + processError.message);
+                }
+            }
+            
+            return result.tables.length;
+            
+        } catch (error) {
+            $.writeln("Error in processMarkdownTables: " + error.message);
+            throw new Error("Failed to process Markdown tables: " + error.message);
+        }
+    }
     
     /**
      * Predefined style names in different languages
@@ -608,6 +983,7 @@ var MarkdownImport = (function() {
         smallcaps:  ["small caps", "smallcaps", "petites capitales", "petite cap"],
         subscript:  ["subscript", "indice"],
         superscript:["superscript", "exposant"],
+        strikethrough:["strikethrough", "strike", "barré", "barre"],
         note:       ["note", "footnote", "notes de bas de page"]
     };
     
@@ -636,7 +1012,7 @@ var MarkdownImport = (function() {
                     if (list[j].name.toLowerCase() === preset) return list[j];
                 }
             }
-            return list[0]; // fallback
+            return null;
         }
     
         return {
@@ -656,6 +1032,7 @@ var MarkdownImport = (function() {
             smallcaps:  findByPreset(styleLists.character, STYLE_PRESELECTION.smallcaps),
             superscript:findByPreset(styleLists.character, STYLE_PRESELECTION.superscript),
             subscript:  findByPreset(styleLists.character, STYLE_PRESELECTION.subscript),
+            strikethrough: findByPreset(styleLists.character, STYLE_PRESELECTION.strikethrough),
             note:       findByPreset(styleLists.paragraph, STYLE_PRESELECTION.note)
         };
     }
@@ -774,6 +1151,7 @@ var MarkdownImport = (function() {
                     config.smallcaps = configData.smallcaps !== null ? findStyleByName(styles.character, configData.smallcaps) : null;
                     config.superscript = configData.superscript !== null ? findStyleByName(styles.character, configData.superscript) : null;
                     config.subscript = configData.subscript !== null ? findStyleByName(styles.character, configData.subscript) : null;
+                    config.strikethrough = configData.strikethrough !== null ? findStyleByName(styles.character, configData.strikethrough) : null;
                     config.note = configData.note !== null ? findStyleByName(styles.paragraph, configData.note) : null;
                     
                     // Improved boolean handling for removeBlankPages
@@ -867,7 +1245,8 @@ var MarkdownImport = (function() {
     function saveConfiguration(config) {
         try {
             // Show save dialog to choose location and filename
-            var saveFile = File.saveDialog("Save Configuration", "Config files:*" + CONFIG_EXT);
+            var defaultFile = new File(app.activeDocument.filePath + "/mapping" );
+            var saveFile = defaultFile.saveDlg("Save Configuration", "Config files:*" + CONFIG_EXT);
             if (!saveFile) return false;
             
             // Add extension if not provided
@@ -897,8 +1276,24 @@ var MarkdownImport = (function() {
                         smallcaps: config.smallcaps ? config.smallcaps.name : null,
                         subscript: config.subscript ? config.subscript.name : null,
                         superscript: config.superscript ? config.superscript.name : null,
+                        strikethrough: config.strikethrough ? config.strikethrough.name : null,
                         note: config.note ? config.note.name : null,
-                        removeBlankPages: config.removeBlankPages
+                        removeBlankPages: config.removeBlankPages,
+                        
+                        imageConfig: config.imageConfig ? {
+                            ratio: config.imageConfig.ratio,
+                            imageObjectStyle: config.imageConfig.imageObjectStyle ? config.imageConfig.imageObjectStyle.name : null,
+                            captionObjectStyle: config.imageConfig.captionObjectStyle ? config.imageConfig.captionObjectStyle.name : null,
+                            captionParagraphStyle: config.imageConfig.captionParagraphStyle ? config.imageConfig.captionParagraphStyle.name : null,
+                            captionGap: config.imageConfig.captionGap,
+                            captionMaxHeight: config.imageConfig.captionMaxHeight,
+                            imageFolderPath: config.imageConfig.imageFolderPath
+                            } : null,
+                            tableConfig: config.tableConfig ? {
+                                processTablesEnabled: config.tableConfig.processTablesEnabled,
+                                tableStyle: config.tableConfig.tableStyle ? config.tableConfig.tableStyle.name : null,
+                                useAlignment: config.tableConfig.useAlignment
+                            } : null
                     };
                     
                     saveFile.write(JSON.stringify(configData));
@@ -965,10 +1360,37 @@ var MarkdownImport = (function() {
                     config.smallcaps = configData.smallcaps !== null ? findStyleByName(styles.character, configData.smallcaps) || styles.character[0] : null;
                     config.superscript = configData.superscript !== null ? findStyleByName(styles.character, configData.superscript) || styles.character[0] : null;
                     config.subscript = configData.subscript !== null ? findStyleByName(styles.character, configData.subscript) || styles.character[0] : null;
+                    config.strikethrough = configData.strikethrough !== null ? findStyleByName(styles.character, configData.strikethrough) || styles.character[0] : null;
                     config.note = configData.note !== null ? findStyleByName(styles.paragraph, configData.note) || styles.paragraph[0] : null;
                     config.removeBlankPages = configData.removeBlankPages === true;
                     
+                    if (configData.imageConfig) {
+                        config.imageConfig = {
+                            ratio: configData.imageConfig.ratio || 0,
+                            imageObjectStyle: configData.imageConfig.imageObjectStyle ? 
+                                findObjectStyleByNameInsensitive(app.activeDocument, configData.imageConfig.imageObjectStyle) : null,
+                            captionObjectStyle: configData.imageConfig.captionObjectStyle ? 
+                                findObjectStyleByNameInsensitive(app.activeDocument, configData.imageConfig.captionObjectStyle) : null,
+                            captionParagraphStyle: configData.imageConfig.captionParagraphStyle ? 
+                                findStyleByName(styles.paragraph, configData.imageConfig.captionParagraphStyle) : null,
+                            captionGap: configData.imageConfig.captionGap || 4,
+                            captionMaxHeight: configData.imageConfig.captionMaxHeight || 50,
+                            imageFolderPath: configData.imageConfig.imageFolderPath || ""
+                        };
+                    }
+                        
+                    // Load table configuration
+                    if (configData.tableConfig) {
+                        config.tableConfig = {
+                            processTablesEnabled: configData.tableConfig.processTablesEnabled !== false,
+                            tableStyle: configData.tableConfig.tableStyle ? 
+                                findTableStyleByNameInsensitive(app.activeDocument, configData.tableConfig.tableStyle) : null,
+                            useAlignment: configData.tableConfig.useAlignment !== false
+                        };
+                    }
+                        
                     return config;
+                    
                 } catch (e) {
                     alert("Error parsing configuration: " + e.message);
                     return null;
@@ -1028,7 +1450,9 @@ var MarkdownImport = (function() {
             
             // Reset paragraph styles
             app.findTextPreferences = app.changeTextPreferences = null;
-            target.texts[0].appliedParagraphStyle = styleMapping.normal;
+            if (styleMapping.normal) {
+                target.texts[0].appliedParagraphStyle = styleMapping.normal;
+            }
         } catch (e) {
             $.writeln("Error in resetStyles: " + e.message);
             throw new Error("Failed to reset styles: " + e.message);
@@ -1100,7 +1524,8 @@ var MarkdownImport = (function() {
                 { regex: REGEX.italicUnderscore, style: styleMapping.italic },
                 { regex: REGEX.underline, style: styleMapping.underline },
                 { regex: REGEX.smallCapsAttr, style: styleMapping.smallcaps },
-                { regex: REGEX.superscript, style: styleMapping.superscript }
+                { regex: REGEX.superscript, style: styleMapping.superscript },
+                { regex: REGEX.strikethrough, style: styleMapping.strikethrough }
             ];
             for (var i = 0; i < cMap.length; i++) {
                 applyCharStyle(target, cMap[i].regex, cMap[i].style);
@@ -1222,6 +1647,880 @@ var MarkdownImport = (function() {
         } catch (e) {
             $.writeln("Error in applyCharStyle: " + e.message + " for regex: " + regex.source);
         }
+    }
+    
+    /**
+     * Find character style by name (case insensitive)
+     * @param {Document} doc - The InDesign document
+     * @param {String} name - The style name to find
+     * @return {CharacterStyle|null} The found style or null
+     * @private
+     */
+    function findCharacterStyleByNameInsensitive(doc, name) {
+        if (!name) return null;
+        
+        try {
+            // Try exact match first
+            var style = doc.characterStyles.itemByName(name);
+            if (style && style.isValid) return style;
+        } catch (e) {
+            // Style doesn't exist, continue
+        }
+        
+        try {
+            // Try capitalized version
+            var capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+            var styleCapitalized = doc.characterStyles.itemByName(capitalized);
+            if (styleCapitalized && styleCapitalized.isValid) return styleCapitalized;
+        } catch (e) {
+            // Style doesn't exist
+        }
+        
+        // Try case-insensitive search through all styles
+        try {
+            var allCharStyles = doc.characterStyles.everyItem().getElements();
+            var lowerName = name.toLowerCase();
+            
+            for (var i = 0; i < allCharStyles.length; i++) {
+                if (allCharStyles[i].name.toLowerCase() === lowerName) {
+                    return allCharStyles[i];
+                }
+            }
+        } catch (e) {
+            $.writeln("Error in case-insensitive character style search: " + e.message);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Find paragraph style by name (case insensitive)
+     * @param {Document} doc - The InDesign document
+     * @param {String} name - The style name to find
+     * @return {ParagraphStyle|null} The found style or null
+     * @private
+     */
+    function findParagraphStyleByNameInsensitive(doc, name) {
+        if (!name) return null;
+        
+        try {
+            // Try exact match first
+            var style = doc.paragraphStyles.itemByName(name);
+            if (style && style.isValid) return style;
+        } catch (e) {
+            // Style doesn't exist, continue
+        }
+        
+        try {
+            // Try capitalized version
+            var capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+            var styleCapitalized = doc.paragraphStyles.itemByName(capitalized);
+            if (styleCapitalized && styleCapitalized.isValid) return styleCapitalized;
+        } catch (e) {
+            // Style doesn't exist
+        }
+        
+        // Try case-insensitive search through all styles
+        try {
+            var allParaStyles = doc.paragraphStyles.everyItem().getElements();
+            var lowerName = name.toLowerCase();
+            
+            for (var i = 0; i < allParaStyles.length; i++) {
+                if (allParaStyles[i].name.toLowerCase() === lowerName) {
+                    return allParaStyles[i];
+                }
+            }
+        } catch (e) {
+            $.writeln("Error in case-insensitive paragraph style search: " + e.message);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Parse Pandoc attribute string {#id .class1 .class2 key=val}
+     * @param {String} attrStr - The attribute string to parse
+     * @return {Object} Object with id and classes properties
+     * @private
+     */
+    function parsePandocAttributes(attrStr) {
+        var result = { id: null, classes: [] };
+        if (!attrStr) return result;
+        
+        // Remove surrounding whitespace
+        attrStr = attrStr.replace(/^\s+|\s+$/g, '');
+        
+        // Split by whitespace and process each token
+        var tokens = attrStr.split(/\s+/);
+        
+        for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+            if (!token) continue;
+            
+            if (token.charAt(0) === '#') {
+                // ID attribute
+                result.id = token.slice(1);
+            } else if (token.charAt(0) === '.') {
+                // Class attribute
+                result.classes.push(token.slice(1));
+            }
+            // Ignore key=value pairs for now
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Apply Pandoc inline classes: [Text]{.class1 .class2 #id}
+     * Applies character styles corresponding to classes and sets label if ID present
+     * @param {Story} target - The story to process
+     * @private
+     */
+    function applyPandocInlineClasses(target) {
+        try {
+            var doc = app.activeDocument;
+            
+            // Save current search preferences
+            var oldIncludeFootnotes = app.findChangeGrepOptions.includeFootnotes;
+            
+            // Configure search to exclude footnotes for now
+            app.findChangeGrepOptions.includeFootnotes = false;
+            app.findGrepPreferences = app.changeGrepPreferences = null;
+            
+            // Find all Pandoc inline attribute patterns
+            app.findGrepPreferences.findWhat = REGEX.pandocInline.source;
+            var matches = target.findGrep();
+            
+            // Process matches in reverse order to avoid index shifting
+            for (var i = matches.length - 1; i >= 0; i--) {
+                var match = matches[i];
+                var fullText = match.contents;
+                
+                // Parse the matched text to extract content and attributes
+                var regexMatch = fullText.match(REGEX.pandocInline);
+                if (!regexMatch) continue;
+                
+                var content = regexMatch[1];
+                var attrString = regexMatch[2];
+                var attrs = parsePandocAttributes(attrString);
+                
+                // Replace the matched text with just the content
+                match.contents = content;
+                
+                // Apply character styles for each class (last one wins visually)
+                if (attrs.classes && attrs.classes.length > 0) {
+                    for (var c = 0; c < attrs.classes.length; c++) {
+                        var className = attrs.classes[c];
+                        var charStyle = findCharacterStyleByNameInsensitive(doc, className);
+                        
+                        if (charStyle) {
+                            try {
+                                match.appliedCharacterStyle = charStyle;
+                                $.writeln("Applied character style '" + charStyle.name + "' to inline span");
+                            } catch (e) {
+                                $.writeln("Error applying character style '" + className + "': " + e.message);
+                            }
+                        } else {
+                            $.writeln("Character style not found: " + className);
+                        }
+                    }
+                }
+                
+                // Set label if ID is present
+                if (attrs.id) {
+                    try {
+                        match.label = attrs.id;
+                        $.writeln("Set label '" + attrs.id + "' on inline span");
+                    } catch (e) {
+                        $.writeln("Error setting label '" + attrs.id + "': " + e.message);
+                    }
+                }
+            }
+            
+            // Restore search preferences
+            app.findChangeGrepOptions.includeFootnotes = oldIncludeFootnotes;
+            app.findGrepPreferences = app.changeGrepPreferences = null;
+            
+        } catch (e) {
+            $.writeln("Error in applyPandocInlineClasses: " + e.message);
+            // Ensure search preferences are reset
+            try {
+                app.findGrepPreferences = app.changeGrepPreferences = null;
+            } catch (resetError) {
+                // Ignore reset errors
+            }
+        }
+    }
+    
+    /**
+     * Apply Pandoc fenced divs (blocks): ::: {.class1 .class2 #id} ... :::
+     * Applies paragraph style to content and sets label on text frame if ID present
+     * @param {Story} target - The story to process
+     * @private
+     */
+    function applyPandocBlockClasses(target) {
+        try {
+            var doc = app.activeDocument;
+            var paragraphs = target.paragraphs;
+            if (!paragraphs || paragraphs.length === 0) return;
+            
+            var fencesToRemove = []; // Store fences to remove after processing
+            
+            // Process paragraphs forward, but skip processed sections
+            for (var i = 0; i < paragraphs.length; i++) {
+                var paragraph = paragraphs[i];
+                var line = String(paragraph.contents).replace(/\r$/, "");
+                
+                // Check for opening fence
+                var openMatch = line.match(REGEX.pandocFenceOpen);
+                if (!openMatch) continue;
+                
+                var attrs = parsePandocAttributes(openMatch[1]);
+                
+                // Find closing fence
+                var closingIndex = -1;
+                for (var j = i + 1; j < paragraphs.length; j++) {
+                    var closeLine = String(paragraphs[j].contents).replace(/\r$/, "");
+                    if (REGEX.pandocFenceClose.test(closeLine)) {
+                        closingIndex = j;
+                        break;
+                    }
+                }
+                
+                if (closingIndex === -1) {
+                    // Malformed block - no closing fence found
+                    $.writeln("Warning: Pandoc fenced div opened but not closed at paragraph " + (i + 1));
+                    continue;
+                }
+                
+                // Determine paragraph style to apply (first available class)
+                var paragraphStyle = null;
+                if (attrs.classes && attrs.classes.length > 0) {
+                    for (var c = 0; c < attrs.classes.length; c++) {
+                        var className = attrs.classes[c];
+                        paragraphStyle = findParagraphStyleByNameInsensitive(doc, className);
+                        if (paragraphStyle) {
+                            $.writeln("Found paragraph style '" + paragraphStyle.name + "' for class '" + className + "'");
+                            break;
+                        }
+                    }
+                    
+                    if (!paragraphStyle) {
+                        $.writeln("No paragraph styles found for classes: " + attrs.classes.join(", "));
+                    }
+                }
+                
+                // Apply paragraph style to content between fences
+                if (paragraphStyle) {
+                    for (var k = i + 1; k < closingIndex; k++) {
+                        try {
+                            paragraphs[k].appliedParagraphStyle = paragraphStyle;
+                        } catch (e) {
+                            $.writeln("Error applying paragraph style to paragraph " + (k + 1) + ": " + e.message);
+                        }
+                    }
+                }
+                
+                // Set label on text frame of first inner paragraph if ID present
+                if (attrs.id && (i + 1) < closingIndex) {
+                    try {
+                        var firstInnerParagraph = paragraphs[i + 1];
+                        var textFrames = firstInnerParagraph.parentTextFrames;
+                        
+                        if (textFrames && textFrames.length > 0) {
+                            textFrames[0].label = attrs.id;
+                            $.writeln("Set label '" + attrs.id + "' on text frame");
+                        }
+                    } catch (e) {
+                        $.writeln("Error setting label '" + attrs.id + "' on text frame: " + e.message);
+                    }
+                }
+                
+                // Mark fences for removal
+                fencesToRemove.push(paragraphs[i]);      // Opening fence
+                fencesToRemove.push(paragraphs[closingIndex]); // Closing fence
+                
+                // Skip to after the closing fence
+                i = closingIndex;
+            }
+            
+            // Remove fences in reverse order to avoid index issues
+            for (var r = fencesToRemove.length - 1; r >= 0; r--) {
+                try {
+                    fencesToRemove[r].remove();
+                } catch (e) {
+                    $.writeln("Error removing fence: " + e.message);
+                }
+            }
+            
+        } catch (e) {
+            $.writeln("Error in applyPandocBlockClasses: " + e.message);
+        }
+    }
+    
+    /**
+     * Process Markdown images in story
+     * @param {Story} story - Story to process
+     * @param {Folder} baseFolder - Base folder for image resolution
+     * @param {Object} config - Processing configuration
+     * @param {Boolean} silentMode - Whether to suppress UI messages
+     * @return {Number} Number of images processed
+     */
+    function processStoryImages(story, baseFolder, config, silentMode) {
+        var processedCount = 0;
+        var errorCount = 0;
+        
+        try {
+            var paragraphs = story.paragraphs;
+            if (!paragraphs || !paragraphs.length) return processedCount;
+            
+            // Process backwards to avoid index issues when removing text
+            for (var pi = paragraphs.length - 1; pi >= 0; pi--) {
+                var paragraph = paragraphs[pi];
+                if (!paragraph.isValid) continue;
+                
+                var text = String(paragraph.contents);
+                var searchPos = 0;
+                
+                // Find all Markdown images in this paragraph
+                while (true) {
+                    // Find image start: ![
+                    var imageStart = text.indexOf("![", searchPos);
+                    if (imageStart < 0) break;
+                    
+                    // Find alt text end: ] followed by (
+                    var altEnd = -1;
+                    var i = imageStart + 2;
+                    var bracketDepth = 1;
+                    
+                    while (i < text.length) {
+                        var character = text.charAt(i);
+                        if (character === '[') {
+                            bracketDepth++;
+                        } else if (character === ']') {
+                            bracketDepth--;
+                            if (bracketDepth === 0 && (i + 1) < text.length && text.charAt(i + 1) === '(') {
+                                altEnd = i;
+                                break;
+                            }
+                        } else if (character === '\r' || character === '\n') {
+                            // Line break interrupts image syntax
+                            break;
+                        }
+                        i++;
+                    }
+                    
+                    if (altEnd < 0) {
+                        searchPos = imageStart + 2;
+                        continue;
+                    }
+                    
+                    // Extract alt text (may contain rich formatting)
+                    var altText = text.substring(imageStart + 2, altEnd);
+                    
+                    // Find URL end: closing )
+                    var urlStart = altEnd + 2;
+                    var urlEnd = -1;
+                    var j = urlStart;
+                    var parenDepth = 1;
+                    
+                    while (j < text.length) {
+                        var urlChar = text.charAt(j);
+                        if (urlChar === '(') {
+                            parenDepth++;
+                        } else if (urlChar === ')') {
+                            parenDepth--;
+                            if (parenDepth === 0) {
+                                urlEnd = j;
+                                break;
+                            }
+                        } else if (urlChar === '\r' || urlChar === '\n') {
+                            // Line break interrupts image syntax
+                            break;
+                        }
+                        j++;
+                    }
+                    
+                    if (urlEnd < 0) {
+                        searchPos = imageStart + 2;
+                        continue;
+                    }
+                    
+                    // Parse URL and optional title
+                    var urlContent = text.substring(urlStart, urlEnd).replace(/^\s+|\s+$/g, "");
+                    var imagePath = urlContent;
+                    var imageTitle = "";
+                    
+                    // Check for title in quotes: path "title" or path 'title'
+                    var titleMatch = urlContent.match(/^([^"'\s]+)\s+["']([^"']*)["']$/);
+                    if (titleMatch) {
+                        imagePath = titleMatch[1];
+                        imageTitle = titleMatch[2];
+                    }
+                    
+                    // Validate image file extension
+                    if (!isValidImageFile(imagePath)) {
+                        searchPos = imageStart + 2;
+                        continue;
+                    }
+                    
+                    try {
+                        // Get character range for the entire image syntax
+                        var startChar = paragraph.characters[imageStart];
+                        var endChar = paragraph.characters[urlEnd];
+                        
+                        if (!startChar || !endChar || !startChar.isValid || !endChar.isValid) {
+                            searchPos = imageStart + 2;
+                            continue;
+                        }
+                        
+                        var textRange = paragraph.texts.itemByRange(startChar, endChar);
+                        if (!textRange || !textRange.isValid) {
+                            searchPos = imageStart + 2;
+                            continue;
+                        }
+                        
+                        // Resolve image file path
+                        var imageFile = resolvePath(baseFolder, imagePath);
+                        if (!imageFile) {
+                            // Replace with error message
+                            textRange.contents = "[" + I18n.__("imageNotFound", imagePath) + "]";
+                            errorCount++;
+                            searchPos = imageStart + 2;
+                            continue;
+                        }
+                        
+                        // Get context for placement
+                        var insertionPoint = startChar.insertionPoints[0];
+                        var page = findPageOfInsertionPoint(insertionPoint);
+                        var columnWidth = getColumnWidthFromInsertionPoint(insertionPoint);
+                        
+                        // Create image frame
+                        var frameHeight = (config.ratio > 0) ? (columnWidth * config.ratio) : (columnWidth * 0.6);
+                        
+                        var imageRect = page.rectangles.add({
+                            geometricBounds: [0, 0, frameHeight, columnWidth],
+                            strokeWeight: 0,
+                            strokeColor: app.activeDocument.swatches.itemByName("None"),
+                            fillColor: app.activeDocument.swatches.itemByName("None")
+                        });
+                        
+                        // Place image
+                        imageRect.place(imageFile);
+                        
+                        // Handle aspect ratio
+                        if (config.ratio > 0) {
+                            // Fixed ratio: may crop image to fit
+                            imageRect.fit(FitOptions.FILL_PROPORTIONALLY);
+                            imageRect.fit(FitOptions.CENTER_CONTENT);
+                        } else {
+                            // Free ratio: preserve full image, adjust frame height
+                            try {
+                                var image = imageRect.images[0];
+                                var imageBounds = image.geometricBounds;
+                                var imageWidth = imageBounds[3] - imageBounds[1];
+                                var imageHeight = imageBounds[2] - imageBounds[0];
+                                var imageRatio = (imageWidth > 0) ? (imageHeight / imageWidth) : 0.75;
+                                
+                                // Adjust frame to match image ratio
+                                var newHeight = columnWidth * imageRatio;
+                                var frameBounds = imageRect.geometricBounds;
+                                var top = frameBounds[0];
+                                var left = frameBounds[1];
+                                imageRect.geometricBounds = [top, left, top + newHeight, left + columnWidth];
+                                
+                                // Fit without cropping
+                                imageRect.fit(FitOptions.PROPORTIONALLY);
+                                imageRect.fit(FitOptions.CENTER_CONTENT);
+                            } catch (fitError) {
+                                // Fallback to proportional fit
+                                imageRect.fit(FitOptions.PROPORTIONALLY);
+                                imageRect.fit(FitOptions.CENTER_CONTENT);
+                            }
+                        }
+                        
+                        // Apply image object style
+                        if (config.imageObjectStyle) {
+                            try {
+                                imageRect.appliedObjectStyle = config.imageObjectStyle;
+                            } catch (styleError) {
+                                $.writeln("Failed to apply image object style: " + styleError.message);
+                            }
+                        }
+                        
+                        var finalObject = imageRect;
+                        
+                        // Create caption if alt text exists
+                        if (altText && altText.length > 0) {
+                            var imageBounds = imageRect.geometricBounds;
+                            var captionLeft = imageBounds[1];
+                            var captionTop = imageBounds[2] + config.captionGap;
+                            var captionRight = captionLeft + columnWidth;
+                            var captionBottom = captionTop + config.captionMaxHeight;
+                            
+                            var captionFrame = page.textFrames.add();
+                            captionFrame.geometricBounds = [captionTop, captionLeft, captionBottom, captionRight];
+                            
+                            // Copy alt text with rich formatting (may include footnotes and styles)
+                            try {
+                                var altStartChar = paragraph.characters[imageStart + 2];
+                                var altEndChar = paragraph.characters[altEnd - 1];
+                                
+                                if (altStartChar && altEndChar && altStartChar.isValid && altEndChar.isValid) {
+                                    var altRange = paragraph.texts.itemByRange(altStartChar, altEndChar);
+                                    if (altRange && altRange.isValid) {
+                                        // Duplicate preserves formatting, footnotes, etc.
+                                        altRange.duplicate(LocationOptions.AT_BEGINNING, captionFrame.insertionPoints[0]);
+                                    } else {
+                                        captionFrame.contents = altText;
+                                    }
+                                } else {
+                                    captionFrame.contents = altText;
+                                }
+                            } catch (copyError) {
+                                $.writeln("Error copying alt text: " + copyError.message);
+                                captionFrame.contents = altText;
+                            }
+                            
+                            // Apply caption paragraph style
+                            if (config.captionParagraphStyle) {
+                                try {
+                                    captionFrame.texts[0].appliedParagraphStyle = config.captionParagraphStyle;
+                                } catch (paraStyleError) {
+                                    $.writeln("Failed to apply caption paragraph style: " + paraStyleError.message);
+                                }
+                            }
+                            
+                            // Set caption frame to auto-resize
+                            try {
+                                captionFrame.textFramePreferences.autoSizingReferencePoint = AutoSizingReferenceEnum.TOP_LEFT_POINT;
+                                captionFrame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.HEIGHT_ONLY;
+                            } catch (autoSizeError) {
+                                $.writeln("Failed to set caption auto-sizing: " + autoSizeError.message);
+                            }
+                            
+                            // Apply caption object style
+                            if (config.captionObjectStyle) {
+                                try {
+                                    captionFrame.appliedObjectStyle = config.captionObjectStyle;
+                                } catch (objStyleError) {
+                                    $.writeln("Failed to apply caption object style: " + objStyleError.message);
+                                }
+                            }
+                            
+                            // Group image and caption
+                            try {
+                                finalObject = app.activeDocument.groups.add([imageRect, captionFrame]);
+                            } catch (groupError) {
+                                $.writeln("Failed to group image and caption: " + groupError.message);
+                                finalObject = imageRect; // Use image alone
+                            }
+                        }
+                        
+                        // Anchor the final object
+                        if (finalObject && finalObject.isValid) {
+                            anchorAt(finalObject, insertionPoint);
+                        }
+                        
+                        // Remove the Markdown syntax from text
+                        textRange.remove();
+                        
+                        // Update text and search position for next iteration
+                        text = String(paragraph.contents);
+                        searchPos = imageStart;
+                        processedCount++;
+                        
+                        // Clean up object references
+                        imageRect = null;
+                        captionFrame = null;
+                        finalObject = null;
+                        
+                    } catch (imageError) {
+                        // Replace with error message and continue
+                        try {
+                            var errorStartChar = paragraph.characters[imageStart];
+                            var errorEndChar = paragraph.characters[urlEnd];
+                            
+                            if (errorStartChar && errorEndChar && errorStartChar.isValid && errorEndChar.isValid) {
+                                var errorRange = paragraph.texts.itemByRange(errorStartChar, errorEndChar);
+                                errorRange.contents = "[" + I18n.__("errorProcessingImage", imageError.message) + "]";
+                            }
+                        } catch (replaceError) {
+                            $.writeln("Failed to insert error message: " + replaceError.message);
+                        }
+                        
+                        errorCount++;
+                        searchPos = imageStart + 2;
+                        $.writeln("Error processing image: " + imageError.message);
+                    }
+                }
+            }
+            
+        } catch (e) {
+            $.writeln("Critical error in processStoryImages: " + e.message);
+            throw e;
+        }
+        
+        if (errorCount > 0 && !silentMode) {
+            $.writeln("Processing completed with " + errorCount + " errors");
+        }
+        
+        return processedCount;
+    }
+    
+    /**
+     * Find object style by name (case insensitive) 
+     * @param {Document} doc - The InDesign document
+     * @param {String} name - The style name to find
+     * @return {ObjectStyle|null} The found style or null
+     * @private
+     */
+    function findObjectStyleByNameInsensitive(doc, name) {
+        if (!name) return null;
+        
+        try {
+            // Try exact match first
+            var style = doc.objectStyles.itemByName(name);
+            if (style && style.isValid) return style;
+        } catch (e) {
+            // Style doesn't exist, continue
+        }
+        
+        try {
+            // Try capitalized version
+            var capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+            var styleCapitalized = doc.objectStyles.itemByName(capitalized);
+            if (styleCapitalized && styleCapitalized.isValid) return styleCapitalized;
+        } catch (e) {
+            // Style doesn't exist
+        }
+        
+        // Try case-insensitive search through all styles
+        try {
+            var allObjStyles = doc.objectStyles.everyItem().getElements();
+            var lowerName = name.toLowerCase();
+            
+            for (var i = 0; i < allObjStyles.length; i++) {
+                if (allObjStyles[i].name.toLowerCase() === lowerName) {
+                    return allObjStyles[i];
+                }
+            }
+        } catch (e) {
+            $.writeln("Error in case-insensitive object style search: " + e.message);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Find table style by name (case insensitive)
+     * @param {Document} doc - The InDesign document
+     * @param {String} name - The style name to find
+     * @return {TableStyle|null} The found style or null
+     * @private
+     */
+    function findTableStyleByNameInsensitive(doc, name) {
+        if (!name) return null;
+        
+        try {
+            // Try exact match first
+            var style = doc.tableStyles.itemByName(name);
+            if (style && style.isValid) return style;
+        } catch (e) {
+            // Style doesn't exist, continue
+        }
+        
+        try {
+            // Try case-insensitive search through all styles
+            var allTableStyles = doc.tableStyles.everyItem().getElements();
+            var lowerName = name.toLowerCase();
+            
+            for (var i = 0; i < allTableStyles.length; i++) {
+                if (allTableStyles[i].name.toLowerCase() === lowerName) {
+                    return allTableStyles[i];
+                }
+            }
+        } catch (e) {
+            $.writeln("Error in case-insensitive table style search: " + e.message);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Resolve file path relative to base folder
+     * @param {Folder} baseFolder - Base folder for relative paths
+     * @param {String} pathStr - Path string to resolve
+     * @return {File|null} Resolved file or null if not found
+     */
+    function resolvePath(baseFolder, pathStr) {
+        // Clean path
+        pathStr = String(pathStr).replace(/^\s+|\s+$/g, "");
+    
+        // Try absolute path first
+        var file = new File(pathStr);
+        if (file.exists) return file;
+    
+        // Try relative to base folder
+        if (baseFolder) {
+            file = new File(baseFolder.fsName + "/" + pathStr);
+            if (file.exists) return file;
+    
+            // Fallback: use only basename (filename without path)
+            var basename = pathStr.replace(/^.*[\/\\]/, "");
+            if (basename && basename !== pathStr) {
+                file = new File(baseFolder.fsName + "/" + basename);
+                if (file.exists) return file;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if file has valid image extension
+     * @param {String} path - File path to check
+     * @return {Boolean} True if valid image file
+     */
+    function isValidImageFile(path) {
+        return /\.(jpg|jpeg|png|gif|tif|tiff|psd|ai|eps|pdf|bmp|webp)$/i.test(path);
+    }
+    
+    /**
+     * Find page containing insertion point
+     * @param {InsertionPoint} ip - Insertion point
+     * @return {Page} Page object
+     */
+    function findPageOfInsertionPoint(ip) {
+        try {
+            var textFrames = ip.parentTextFrames;
+            if (textFrames && textFrames.length > 0) {
+                var textFrame = textFrames[0];
+                if (textFrame.parentPage) return textFrame.parentPage;
+                if (textFrame.parent && textFrame.parent.constructor.name === "Spread") {
+                    return textFrame.parent.pages[0];
+                }
+            }
+        } catch (e) {
+            $.writeln("Error finding page: " + e.message);
+        }
+        
+        // Fallback to active or first page
+        try {
+            return app.activeWindow.activePage || app.activeDocument.pages[0];
+        } catch (e2) {
+            $.writeln("Error getting fallback page: " + e2.message);
+            return app.activeDocument.pages[0];
+        }
+    }
+    
+    /**
+     * Get column width from insertion point context
+     * @param {InsertionPoint} ip - Insertion point
+     * @return {Number} Column width in points
+     */
+    function getColumnWidthFromInsertionPoint(ip) {
+        try {
+            var textFrames = ip.parentTextFrames;
+            if (!textFrames || textFrames.length === 0) return 200;
+            
+            var textFrame = textFrames[0];
+            var bounds = textFrame.geometricBounds;
+            var insets = textFrame.textFramePreferences.insetSpacing;
+            var innerWidth = (bounds[3] - bounds[1]) - (insets[1] + insets[3]);
+            var columns = textFrame.textFramePreferences.textColumnCount || 1;
+            var gutter = textFrame.textFramePreferences.textColumnGutter || 0;
+            
+            if (columns > 1) {
+                return (innerWidth - gutter * (columns - 1)) / columns;
+            }
+            return innerWidth;
+        } catch (e) {
+            $.writeln("Error calculating column width: " + e.message);
+            return 200; // Fallback width
+        }
+    }
+    
+    /**
+     * Anchor object at insertion point using "Above Line" position
+     * @param {PageItem} pageItem - Object to anchor
+     * @param {InsertionPoint} ip - Insertion point for anchoring
+     */
+    function anchorAt(pageItem, ip) {
+        try {
+            var anchorPos = AnchorPosition;
+            
+            // Handle different InDesign versions
+            var aboveLine = (typeof anchorPos.ABOVE_LINE_POSITION !== "undefined") ? 
+                           anchorPos.ABOVE_LINE_POSITION : anchorPos.ABOVE_LINE;
+            
+            // Insert anchored object
+            pageItem.anchoredObjectSettings.insertAnchoredObject(ip, aboveLine);
+            
+            // Ensure position is set correctly
+            pageItem.anchoredObjectSettings.anchoredPosition = aboveLine;
+            
+            // Optional fine-tuning
+            try {
+                pageItem.anchoredObjectSettings.spaceAbove = 0;
+                pageItem.anchoredObjectSettings.spaceBelow = 0;
+            } catch (e) {
+                // These properties might not be available in all versions
+            }
+            
+        } catch (e) {
+            $.writeln("Error anchoring object: " + e.message);
+            throw e; // Re-throw to handle in calling function
+        }
+    }
+    
+    /**
+     * Get base folder for image resolution
+     * @param {Document} doc - InDesign document
+     * @param {Boolean} silentMode - Whether to suppress dialogs
+     * @return {Folder|null} Base folder or null
+     */
+    function getBaseFolder(doc, silentMode) {
+        var baseFolder = null;
+        
+        // Priority 1: User-saved path in document label
+        try {
+            var savedPath = doc.extractLabel("__img_base__");
+            if (savedPath) {
+                var folder = new Folder(savedPath);
+                if (folder && folder.exists) {
+                    baseFolder = folder;
+                }
+            }
+        } catch (e) {
+            $.writeln("Error reading image base label: " + e.message);
+        }
+        
+        // Priority 2: Document folder if saved
+        if (!baseFolder && app.activeDocument.saved) {
+            try {
+                baseFolder = app.activeDocument.fullName.parent;
+            } catch (e) {
+                $.writeln("Error getting document folder: " + e.message);
+            }
+        }
+        
+        // Priority 3: Ask user (if not in silent mode)
+        if (!baseFolder && !silentMode) {
+            baseFolder = Folder.selectDialog(I18n.__("selectImageFolder"));
+            if (!baseFolder) return null;
+        }
+        
+        // Save for next time (only if we found a valid folder)
+        if (baseFolder) {
+            try {
+                doc.insertLabel("__img_base__", baseFolder.fsName);
+            } catch (e) {
+                $.writeln("Error saving image base label: " + e.message);
+            }
+        }
+        
+        return baseFolder;
     }
     
     /**
@@ -1466,6 +2765,11 @@ var MarkdownImport = (function() {
                         applyCharStyleToFootnoteText(footnoteText, REGEX.smallCapsAttr, styleMapping.smallcaps);
                         applyCharStyleToFootnoteText(footnoteText, REGEX.superscript, styleMapping.superscript);
                         applyCharStyleToFootnoteText(footnoteText, REGEX.subscript, styleMapping.subscript);
+                        try {
+                            applyPandocInlineClasses(footnoteText.parentStory);
+                        } catch (pandocError) {
+                            $.writeln("Error applying Pandoc inline classes in footnote: " + pandocError.message);
+                        }
                     }
                 } catch(e) {
                     // Skip stories with no footnotes
@@ -1516,11 +2820,24 @@ var MarkdownImport = (function() {
         try {
             var oldOpt = app.findChangeGrepOptions.includeFootnotes;
             app.findChangeGrepOptions.includeFootnotes = false; // Don't include footnotes here
-    
+
+            // Hard line breaks (Markdown): two spaces (U+0020) + return -> forced line break (~S)
+            app.findGrepPreferences = app.changeGrepPreferences = null;
+            app.findChangeGrepOptions.includeFootnotes = false;
+            app.findGrepPreferences.findWhat = "\\x{0020}{2,}\\r";
+            app.changeGrepPreferences.changeTo = "\\n";
+            target.changeGrep();
+            app.findGrepPreferences = app.changeGrepPreferences = null;
+            
             // Replace multiple line breaks with single one
             app.findGrepPreferences = app.changeGrepPreferences = null;
             app.findGrepPreferences.findWhat = REGEX.lineBreaks.source;
             app.changeGrepPreferences.changeTo = "\\r";
+            target.changeGrep();
+            
+            app.findGrepPreferences = app.changeGrepPreferences = null;
+            app.findGrepPreferences.findWhat = "--";
+            app.changeGrepPreferences.changeTo = "\\x{2013}";
             target.changeGrep();
     
             // Convert double hyphens to em dash
@@ -1683,10 +3000,40 @@ var MarkdownImport = (function() {
                 }
                 return styles;
             }
+            
+            function collectTableStyles() {
+                var styles = [];
+                try {
+                    var tStyles = doc.tableStyles.everyItem().getElements();
+                    for (var i = 0; i < tStyles.length; i++) {
+                        if (!tStyles[i].name.match(/^\[/)) {
+                            styles.push(tStyles[i]);
+                        }
+                    }
+                } catch(e) {
+                    $.writeln("Error collecting table styles: " + e.message);
+                }
+                return styles;
+            }
+            
+            function collectObjectStyles(group) {
+                var styles = [];
+                var oStyles = group.objectStyles;
+                for (var i = 0; i < oStyles.length; i++) {
+                    if (!oStyles[i].name.match(/^\[/)) styles.push(oStyles[i]);
+                }
+                var oGroups = group.objectStyleGroups;
+                for (var j = 0; j < oGroups.length; j++) {
+                    styles = styles.concat(collectObjectStyles(oGroups[j]));
+                }
+                return styles;
+            }
     
             return {
                 paragraph: collectParagraphStyles(doc),
-                character: collectCharacterStyles(doc)
+                character: collectCharacterStyles(doc),
+                object: collectObjectStyles(doc),
+                table: collectTableStyles()
             };
         } catch (e) {
             $.writeln("Error in collectStyles: " + e.message);
@@ -1704,6 +3051,10 @@ var MarkdownImport = (function() {
     try {
         var noneText = I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]";
         var paraStyleNames = [noneText], charStyleNames = [noneText];
+        var tableStyleNames = [noneText];
+        for (var i = 0; i < styles.table.length; i++) {
+            tableStyleNames.push(styles.table[i].name);
+        }
         
         for (var i = 0; i < styles.paragraph.length; i++) {
             paraStyleNames.push(styles.paragraph[i].name);
@@ -1783,6 +3134,40 @@ var MarkdownImport = (function() {
         tab3.orientation = "column";
         tab3.alignChildren = "left";
         
+        // Onglet des images
+        var tab4 = tpanel.add("tab", undefined, I18n.__("imageConfiguration"));
+        tab4.orientation = "column";
+        tab4.alignChildren = "left";
+        
+        // Onglet des tableaux
+        var tab5 = tpanel.add("tab", undefined, I18n.__("tables"));
+        tab5.orientation = "column";
+        tab5.alignChildren = "left";
+        
+        // Enable tables processing
+        var tablesEnabledGroup = tab5.add("group");
+        tablesEnabledGroup.orientation = "row";
+        tablesEnabledGroup.alignChildren = "left";
+        var tablesEnabledCheck = tablesEnabledGroup.add("checkbox", undefined, I18n.__("processTablesEnabled"));
+        tablesEnabledCheck.value = true; // Enabled by default
+        
+        // Table style selection
+        var tableStyleGroup = tab5.add("group");
+        tableStyleGroup.orientation = "row";
+        tableStyleGroup.alignChildren = "left";
+        var tableStyleLabel = tableStyleGroup.add("statictext", undefined, I18n.__("tableStyle"));
+        tableStyleLabel.preferredSize.width = 120;
+        var tableStyleList = tableStyleGroup.add("dropdownlist", undefined, tableStyleNames);
+        tableStyleList.preferredSize.width = 200;
+        tableStyleList.selection = 0;
+        
+        // Table alignment option
+        var alignmentGroup = tab5.add("group");
+        alignmentGroup.orientation = "row";
+        alignmentGroup.alignChildren = "left";
+        var alignmentCheck = alignmentGroup.add("checkbox", undefined, I18n.__("useTableAlignment"));
+        alignmentCheck.value = true; // Enabled by default
+        
         // Sélection de l'onglet par défaut
         tpanel.selection = tab1;
     
@@ -1813,13 +3198,128 @@ var MarkdownImport = (function() {
         var sItalic = addStyleSelector(tab2, I18n.__("italic"), charStyleNames);
         var sBold = addStyleSelector(tab2, I18n.__("bold"), charStyleNames);
         var sBoldItalic = addStyleSelector(tab2, I18n.__("bolditalic"), charStyleNames);
-        var sUnderline = addStyleSelector(tab2, I18n.__("underline"), charStyleNames);
         var sSmallCaps = addStyleSelector(tab2, I18n.__("smallcaps"), charStyleNames);
-        var sSubscript = addStyleSelector(tab2, I18n.__("subscript"), charStyleNames);
         var sSuperscript = addStyleSelector(tab2, I18n.__("superscript"), charStyleNames);
+        var sSubscript = addStyleSelector(tab2, I18n.__("subscript"), charStyleNames);
+        var sUnderline = addStyleSelector(tab2, I18n.__("underline"), charStyleNames);
+        var sStrikethrough = addStyleSelector(tab2, I18n.__("strikethrough"), charStyleNames);
     
         // Ajout du sélecteur de style dans l'onglet des notes de bas de page
         var sFootnotePara = addStyleSelector(tab3, I18n.__("footnoteStyle"), paraStyleNames);
+        
+        // Créer un groupe principal avec deux colonnes
+        var imageMainGroup = tab4.add("group");
+        imageMainGroup.orientation = "row";
+        imageMainGroup.alignChildren = "top";
+        imageMainGroup.spacing = 15;
+        
+        // === COLONNE GAUCHE ===
+        var leftColumn = imageMainGroup.add("group");
+        leftColumn.orientation = "column";
+        leftColumn.alignChildren = "fill";
+        leftColumn.preferredSize.width = 250;
+        
+        // Image folder panel (colonne gauche)
+        var imgFolderPanel = leftColumn.add("panel", undefined, I18n.__("selectImageFolder"));
+        imgFolderPanel.orientation = "column";
+        imgFolderPanel.alignChildren = "fill";
+        imgFolderPanel.margins = 10;
+        imgFolderPanel.spacing = 8;
+        
+        var pathField = imgFolderPanel.add("edittext", undefined, "");
+        pathField.characters = 25;
+        
+        var buttonGroup = imgFolderPanel.add("group");
+        buttonGroup.orientation = "row";
+        buttonGroup.alignment = "center";
+        var browseBtn = buttonGroup.add("button", undefined, I18n.getLanguage() === 'fr' ? "Parcourir" : "Browse");
+        var resetBtn = buttonGroup.add("button", undefined, I18n.getLanguage() === 'fr' ? "Par d\u00E9faut" : "Default");
+        
+        // Pre-populate image root path (reste identique)
+        (function preloadImageRoot() {
+            var baseFolder = null;
+            try {
+                var doc = app.activeDocument;
+                var savedPath = doc.extractLabel("__img_base__");
+                if (savedPath) {
+                    var f = new Folder(savedPath);
+                    if (f && f.exists) baseFolder = f;
+                }
+            } catch (e) {}
+        
+            if (!baseFolder && app.activeDocument.saved) {
+                try {
+                    baseFolder = app.activeDocument.fullName.parent;
+                } catch (e) {}
+            }
+        
+            pathField.text = baseFolder ? baseFolder.fsName : "";
+        })();
+        
+        browseBtn.onClick = function() {
+            var picked = Folder.selectDialog(I18n.__("selectImageFolder"));
+            if (picked) pathField.text = picked.fsName;
+        };
+        
+        resetBtn.onClick = function() {
+            try {
+                if (app.activeDocument.saved) pathField.text = app.activeDocument.fullName.parent.fsName;
+                else pathField.text = "";
+            } catch (e) { 
+                pathField.text = ""; 
+            }
+        };
+        
+        // Aspect ratio panel (colonne gauche)
+        var ratioPanel = leftColumn.add("panel", undefined, I18n.__("aspectRatio"));
+        ratioPanel.alignChildren = "fill";
+        var ratioList = ratioPanel.add("dropdownlist", undefined, [
+            I18n.__("freeRatio"), "3:2", "4:3", "16:9", "1:1"
+        ]);
+        ratioList.selection = 0;
+        
+        // === COLONNE DROITE ===
+        var rightColumn = imageMainGroup.add("group");
+        rightColumn.orientation = "column";
+        rightColumn.alignChildren = "fill";
+        rightColumn.preferredSize.width = 250;
+        
+        // Image style panel (colonne droite - DÉPLACÉ ICI)
+        var imgStylePanel = rightColumn.add("panel", undefined, I18n.__("imageStyle"));
+        imgStylePanel.alignChildren = "left";
+        imgStylePanel.add("statictext", undefined, I18n.__("imageObjectStyle"));
+        
+        var objStyleNames = ["[None]"];
+        for (var i = 0; i < styles.object.length; i++) {
+            objStyleNames.push(styles.object[i].name);
+        }
+        var imgObjStyleList = imgStylePanel.add("dropdownlist", undefined, objStyleNames);
+        imgObjStyleList.preferredSize.width = 200;
+        imgObjStyleList.selection = 0;
+        
+        // Caption panel (colonne droite)
+        var imgCaptionPanel = rightColumn.add("panel", undefined, I18n.__("captionSettings"));
+        imgCaptionPanel.alignChildren = "left";
+        
+        imgCaptionPanel.add("statictext", undefined, I18n.__("captionObjectStyle"));
+        var capObjStyleList = imgCaptionPanel.add("dropdownlist", undefined, objStyleNames);
+        capObjStyleList.preferredSize.width = 200;
+        capObjStyleList.selection = 0;
+        
+        imgCaptionPanel.add("statictext", undefined, I18n.__("captionParagraphStyle"));
+        var capParaStyleList = imgCaptionPanel.add("dropdownlist", undefined, paraStyleNames);
+        capParaStyleList.preferredSize.width = 200;
+        capParaStyleList.selection = 0;
+        
+        var gapGroup = imgCaptionPanel.add("group");
+        gapGroup.add("statictext", undefined, I18n.__("captionGap"));
+        var gapInput = gapGroup.add("edittext", undefined, "4");
+        gapInput.characters = 5;
+        
+        var heightGroup = imgCaptionPanel.add("group");
+        heightGroup.add("statictext", undefined, I18n.__("captionMaxHeight"));
+        var maxHeightInput = heightGroup.add("edittext", undefined, "50");
+        maxHeightInput.characters = 5;
         
         // Fonction d'aide pour définir la sélection du menu déroulant par valeur de texte
         function setDropdownByText(dropdown, text) {
@@ -1863,6 +3363,7 @@ var MarkdownImport = (function() {
         setDropdownByText(sSmallCaps, guessed.smallcaps ? guessed.smallcaps.name : (I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]"));
         setDropdownByText(sSubscript, guessed.subscript ? guessed.subscript.name : (I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]"));
         setDropdownByText(sSuperscript, guessed.superscript ? guessed.superscript.name : (I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]"));
+        setDropdownByText(sStrikethrough, guessed.strikethrough ? guessed.strikethrough.name : (I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]"));
         setDropdownByText(sFootnotePara, guessed.note ? guessed.note.name : (I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]"));
         
         // Ajout d'une option pour supprimer les pages après la fin du texte
@@ -1892,6 +3393,26 @@ var MarkdownImport = (function() {
                 return null;
             }
             
+            function getObjectStyleByName(name) {
+                var noneText = I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]";
+                if (name === noneText) return null;
+                
+                for (var i = 0; i < styles.object.length; i++) {
+                    if (styles.object[i].name === name) return styles.object[i];
+                }
+                return null;
+            }
+            
+            function getTableStyleByName(name) {
+                var noneText = I18n.getLanguage() === 'fr' ? "[aucun]" : "[None]";
+                if (name === noneText) return null;
+                
+                for (var i = 0; i < styles.table.length; i++) {
+                    if (styles.table[i].name === name) return styles.table[i];
+                }
+                return null;
+            }
+            
             // Configuration du bouton de chargement
             loadConfigBtn.onClick = function() {
                 var config = loadConfiguration(styles);
@@ -1913,6 +3434,14 @@ var MarkdownImport = (function() {
                     setDropdownByText(sSmallCaps, config.smallcaps.name);
                     setDropdownByText(sSuperscript, config.superscript.name);
                     setDropdownByText(sSubscript, config.subscript.name);
+                    // Load table configuration
+                    if (config.tableConfig) {
+                        tablesEnabledCheck.value = config.tableConfig.processTablesEnabled !== false;
+                        if (config.tableConfig.tableStyle) {
+                            setDropdownByText(tableStyleList, config.tableConfig.tableStyle.name);
+                        }
+                        alignmentCheck.value = config.tableConfig.useAlignment !== false;
+                    }
                     setDropdownByText(sFootnotePara, config.note.name);
                     
                     alert(I18n.__("configLoaded"));
@@ -1939,8 +3468,14 @@ var MarkdownImport = (function() {
                     smallcaps: getStyleByName(styles.character, sSmallCaps.selection.text),
                     superscript: getStyleByName(styles.character, sSuperscript.selection.text),
                     subscript: getStyleByName(styles.character, sSubscript.selection.text),
+                    strikethrough: getStyleByName(styles.character, sStrikethrough.selection.text),
                     note: getStyleByName(styles.paragraph, sFootnotePara.selection.text),
-                    removeBlankPages: removeBlankPagesCheck.value 
+                    removeBlankPages: removeBlankPagesCheck.value,
+                    tableConfig: {
+                        processTablesEnabled: tablesEnabledCheck.value,
+                        tableStyle: getTableStyleByName(tableStyleList.selection ? tableStyleList.selection.text : "[None]"),
+                        useAlignment: alignmentCheck.value
+                    }
                 };
                 
                 if (saveConfiguration(currentConfig)) {
@@ -1955,25 +3490,49 @@ var MarkdownImport = (function() {
             
             if (w.show() !== 1) return null;
              
-            return {
-                h1: getStyleByName(styles.paragraph, sH1.selection.text),
-                h2: getStyleByName(styles.paragraph, sH2.selection.text),
-                h3: getStyleByName(styles.paragraph, sH3.selection.text),
-                h4: getStyleByName(styles.paragraph, sH4.selection.text),
-                h5: getStyleByName(styles.paragraph, sH5.selection.text),
-                h6: getStyleByName(styles.paragraph, sH6.selection.text),
-                quote: getStyleByName(styles.paragraph, sQuote.selection.text),
-                bulletlist: getStyleByName(styles.paragraph, sBulletList.selection.text),
-                normal: getStyleByName(styles.paragraph, sNormal.selection.text),
-                italic: getStyleByName(styles.character, sItalic.selection.text),
-                bold: getStyleByName(styles.character, sBold.selection.text),
-                bolditalic: getStyleByName(styles.character, sBoldItalic.selection.text),
-                underline: getStyleByName(styles.character, sUnderline.selection.text),
-                smallcaps: getStyleByName(styles.character, sSmallCaps.selection.text),
-                superscript: getStyleByName(styles.character, sSuperscript.selection.text),
-                subscript: getStyleByName(styles.character, sSubscript.selection.text),
-                note: getStyleByName(styles.paragraph, sFootnotePara.selection.text),
-                removeBlankPages: removeBlankPagesCheck.value
+           return {
+               h1: getStyleByName(styles.paragraph, sH1.selection.text),
+               h2: getStyleByName(styles.paragraph, sH2.selection.text),
+               h3: getStyleByName(styles.paragraph, sH3.selection.text),
+               h4: getStyleByName(styles.paragraph, sH4.selection.text),
+               h5: getStyleByName(styles.paragraph, sH5.selection.text),
+               h6: getStyleByName(styles.paragraph, sH6.selection.text),
+               quote: getStyleByName(styles.paragraph, sQuote.selection.text),
+               bulletlist: getStyleByName(styles.paragraph, sBulletList.selection.text),
+               normal: getStyleByName(styles.paragraph, sNormal.selection.text),
+               italic: getStyleByName(styles.character, sItalic.selection.text),
+               bold: getStyleByName(styles.character, sBold.selection.text),
+               bolditalic: getStyleByName(styles.character, sBoldItalic.selection.text),
+               underline: getStyleByName(styles.character, sUnderline.selection.text),
+               smallcaps: getStyleByName(styles.character, sSmallCaps.selection.text),
+               superscript: getStyleByName(styles.character, sSuperscript.selection.text),
+               subscript: getStyleByName(styles.character, sSubscript.selection.text),
+               note: getStyleByName(styles.paragraph, sFootnotePara.selection.text),
+               removeBlankPages: removeBlankPagesCheck.value,
+               
+               imageConfig: {
+                   ratio: (function() {
+                       if (!ratioList.selection) return 0;
+                       switch (ratioList.selection.index) {
+                           case 1: return 2/3; // 3:2
+                           case 2: return 3/4; // 4:3  
+                           case 3: return 9/16; // 16:9
+                           case 4: return 1; // 1:1
+                           default: return 0; // Free
+                       }
+                   })(),
+                   imageObjectStyle: getObjectStyleByName(imgObjStyleList.selection ? imgObjStyleList.selection.text : "[None]"),
+                   captionObjectStyle: getObjectStyleByName(capObjStyleList.selection ? capObjStyleList.selection.text : "[None]"),
+                   captionParagraphStyle: getStyleByName(styles.paragraph, capParaStyleList.selection ? capParaStyleList.selection.text : "[None]"),
+                   captionGap: parseInt(gapInput.text, 10) || 4,
+                   captionMaxHeight: parseInt(maxHeightInput.text, 10) || 50,
+                   imageFolderPath: pathField.text
+                   },
+                   tableConfig: {
+                       processTablesEnabled: tablesEnabledCheck.value,
+                       tableStyle: getTableStyleByName(tableStyleList.selection ? tableStyleList.selection.text : "[None]"),
+                       useAlignment: alignmentCheck.value
+                   }
             };
             
         } catch (e) {
@@ -2015,6 +3574,10 @@ var MarkdownImport = (function() {
     
     var doc = app.activeDocument;
     
+    app.scriptPreferences.enableRedraw = false;
+    var oldPreflight = app.preflightOptions.preflightOff;
+    app.preflightOptions.preflightOff = true;
+    
     try {
         // Vérifier le mode silencieux
         var silentMode = false;
@@ -2039,179 +3602,224 @@ var MarkdownImport = (function() {
         // Recueillir les styles du document
         var styles = collectStyles(doc);
         
-        // Vérifier si les collections de styles sont vides
-        if (styles.paragraph.length === 0 || styles.character.length === 0) {
-            var errorMsg = I18n.__("noStyles");
-            if (silentMode) {
-                logToFile(errorMsg, true);
-            } else {
-                alert(errorMsg);
-            }
-            return;
-        }
-            
-            // Charger la configuration automatiquement
-            var autoConfig = autoLoadConfig(styles);
-            
-            // NOUVELLE FONCTIONNALITÉ: Vérifier si la configuration se trouve dans un dossier nommé "config"
-            var configInConfigFolder = false;
-            
-            if (autoConfig) {
-                try {
-                    // Vérifier si le document est enregistré
-                    if (app.activeDocument.saved) {
-                        // Obtenir le chemin du document actif
-                        var docPath = app.activeDocument.filePath;
-                        if (docPath) {
-                            // Parcourir les dossiers parents pour trouver un dossier "config"
-                            var folder = new Folder(docPath);
-                            var foundConfigFiles = findConfigFilesRecursively(folder, 3, 0);
-                            
-                            if (foundConfigFiles && foundConfigFiles.length > 0) {
-                                // Vérifier si le fichier de configuration se trouve dans un dossier nommé "config"
-                                for (var i = 0; i < foundConfigFiles.length; i++) {
-                                    var configFile = foundConfigFiles[i];
-                                    var parentFolder = configFile.parent;
-                                    
-                                    if (parentFolder.name.toLowerCase() === "config") {
-                                        configInConfigFolder = true;
-                                        silentMode = true; // Activer le mode silencieux
-                                        break;
-                                    }
+        // Charger la configuration automatiquement
+        var autoConfig = autoLoadConfig(styles);
+        
+        // NOUVELLE FONCTIONNALITÉ: Vérifier si la configuration se trouve dans un dossier nommé "config"
+        var configInConfigFolder = false;
+        
+        if (autoConfig) {
+            try {
+                // Vérifier si le document est enregistré
+                if (app.activeDocument.saved) {
+                    // Obtenir le chemin du document actif
+                    var docPath = app.activeDocument.filePath;
+                    if (docPath) {
+                        // Parcourir les dossiers parents pour trouver un dossier "config"
+                        var folder = new Folder(docPath);
+                        var foundConfigFiles = findConfigFilesRecursively(folder, 3, 0);
+                        
+                        if (foundConfigFiles && foundConfigFiles.length > 0) {
+                            // Vérifier si le fichier de configuration se trouve dans un dossier nommé "config"
+                            for (var i = 0; i < foundConfigFiles.length; i++) {
+                                var configFile = foundConfigFiles[i];
+                                var parentFolder = configFile.parent;
+                                
+                                if (parentFolder.name.toLowerCase() === "config" && configFile.name === "mapping.mdconfig") {
+                                    configInConfigFolder = true;
+                                    silentMode = true; // Activer le mode silencieux
+                                    break;
                                 }
                             }
                         }
                     }
-                } catch (e) {
-                    $.writeln("Erreur lors de la vérification du dossier config: " + e.message);
-                    // Continuer avec le comportement par défaut
                 }
+            } catch (e) {
+                $.writeln("Erreur lors de la vérification du dossier config: " + e.message);
+                // Continuer avec le comportement par défaut
             }
-            
-            // Mode silencieux avec configuration
-            if (silentMode && autoConfig) {
-                try {
-                    // Utiliser la configuration trouvée directement
-                    var styleMapping = autoConfig;
-                    var logMessage = configInConfigFolder ? 
-                        "Exécution automatique du script: configuration trouvée dans le dossier config" : 
-                        "Using auto-loaded configuration";
-                    logToFile(logMessage, false);
-                    
-                    // Encapsuler le traitement dans une transaction unique
-                    app.doScript(function() {
-                        var target = getTargetStory();
-                        
-                        resetStyles(target, styleMapping);
-                        applyParagraphStyles(target, styleMapping);
-                        applyCharacterStyles(target, styleMapping);
-                        processFootnotes(target, styleMapping);
-                        cleanupText(target);
-                        processFootnoteStyles(styleMapping);
-                        restoreEscapedCharactersInFootnotes();
-                        
-                        // Ajouter la suppression des pages blanches si configurée
-                        if (styleMapping && styleMapping.removeBlankPages) {
-                            try {
-                                var pagesRemoved = removeBlankPagesAfterTextEnd(doc);
-                                if (pagesRemoved > 0) {
-                                    logToFile(pagesRemoved + " blank pages removed", false);
-                                }
-                            } catch (e) {
-                                logToFile("Error while removing blank pages: " + e.message, true);
-                            }
-                        }
-                        
-                    }, ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Markdown Import");
-                    
-                    // Enregistrer explicitement le document
-                    doc.save();
-                    logToFile("Document processed and saved successfully", false);
-                    
-                    return;
-                } catch (e) {
-                    // En mode silencieux, enregistrer les erreurs dans un fichier
-                    logToFile("Error: " + e.message + " (Line: " + e.line + ")", true);
-                    return;
-                }
-            }
-            
-            // Interactive mode
-            var styleMapping = showUI(styles, autoConfig);
-            
-            // Check if user canceled the dialog
-            if (styleMapping) {
-                // Create progress bar
-                createProgressBar(11);
+        }
+        
+        // Mode silencieux avec configuration
+        if (silentMode && autoConfig) {
+            try {
+                // Utiliser la configuration trouvée directement
+                var styleMapping = autoConfig;
+                var logMessage = configInConfigFolder ? 
+                    "Exécution automatique du script: configuration trouvée dans le dossier config" : 
+                    "Using auto-loaded configuration";
+                logToFile(logMessage, false);
                 
-                try {
-                    // Wrap the core operations in a transaction
-                    app.doScript(function() {
-                        // Get target story from selected frame, labeled frame, or first story
-                        updateProgressBar(1, I18n.__("gettingTargetStory"));
-                        var target = getTargetStory();
-                        
-                        // Reset to normal style before processing
-                        updateProgressBar(2, I18n.__("resettingStyles"));
-                        resetStyles(target, styleMapping);
-                        
-                        // Apply paragraph styles (headings, quotes, lists)
-                        updateProgressBar(3, I18n.__("applyingParagraphStyles"));
-                        applyParagraphStyles(target, styleMapping);
-                        
-                        // Apply character styles (bold, italic, etc.)
-                        updateProgressBar(4, I18n.__("applyingCharacterStyles"));
-                        applyCharacterStyles(target, styleMapping);
-                        
-                        // Process footnotes - collect definitions and create InDesign footnotes
-                        updateProgressBar(5, I18n.__("processingFootnotes"));
-                        processFootnotes(target, styleMapping);
-                        
-                        // Clean up text - remove multiple line breaks, escape chars, fix dashes
-                        updateProgressBar(7, I18n.__("cleaningUpText"));
-                        cleanupText(target);
-                        
-                        // Apply styles within footnotes
-                        updateProgressBar(8, I18n.__("processingFootnoteStyles"));
-                        processFootnoteStyles(styleMapping);
-                        
-                        // Restore escaped characters in footnotes
-                        updateProgressBar(9, "Restoring escaped characters in footnotes...");
-                        restoreEscapedCharactersInFootnotes();
-                        
-                        // À l'intérieur de la fonction main, après le traitement des styles
-                        if (styleMapping && styleMapping.removeBlankPages) {
-                            try {
-                                // Mettre à jour la barre de progression
-                                updateProgressBar(10, I18n.__("removingBlankPages"));
-                                
-                                // Supprimer les pages blanches
-                                var pagesRemoved = removeBlankPagesAfterTextEnd(doc);
-                                
-                                // Ajouter l'information au message de fin si des pages ont été supprimées
-                                if (pagesRemoved > 0) {
-                                    var pagesRemovedText = I18n.__("pagesRemoved", pagesRemoved);
-                                    updateProgressBar(11, I18n.__("done") + " " + pagesRemovedText);
-                                } else {
-                                    updateProgressBar(11, I18n.__("done"));
+                // Encapsuler le traitement dans une transaction unique
+                app.doScript(function() {
+                    var target = getTargetStory();
+                    
+                    resetStyles(target, styleMapping);
+                    applyParagraphStyles(target, styleMapping);
+                    applyCharacterStyles(target, styleMapping);
+                    applyPandocInlineClasses(target);
+                    applyPandocBlockClasses(target);
+                    processFootnotes(target, styleMapping);
+                    cleanupText(target);
+                    processFootnoteStyles(styleMapping);
+                    restoreEscapedCharactersInFootnotes();
+                    
+                    try {
+                        var baseFolder = getBaseFolder(doc, true);
+                        if (baseFolder) {
+                            var defaultImageConfig = {
+                                ratio: 0, // Free ratio
+                                imageObjectStyle: null,
+                                captionObjectStyle: null, 
+                                captionParagraphStyle: null,
+                                captionGap: 4,
+                                captionMaxHeight: 50
+                            };
+                            var imageCount = processStoryImages(target, baseFolder, defaultImageConfig, true);
+                            logToFile("Processed " + imageCount + " images", false);
+                        }
+                    } catch (imageError) {
+                        logToFile("Error processing images: " + imageError.message, true);
+                    }
+                    
+                    // Ajouter la suppression des pages blanches si configurée
+                    if (styleMapping && styleMapping.removeBlankPages) {
+                        try {
+                            var pagesRemoved = removeBlankPagesAfterTextEnd(doc);
+                            if (pagesRemoved > 0) {
+                                logToFile(pagesRemoved + " blank pages removed", false);
+                            }
+                        } catch (e) {
+                            logToFile("Error while removing blank pages: " + e.message, true);
+                        }
+                    }
+                    
+                }, ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Markdown Import");
+                
+                // Enregistrer explicitement le document
+                doc.save();
+                logToFile("Document processed and saved successfully", false);
+                
+                return;
+            } catch (e) {
+                // En mode silencieux, enregistrer les erreurs dans un fichier
+                logToFile("Error: " + e.message + " (Line: " + e.line + ")", true);
+                return;
+            }
+        }
+        
+        // Interactive mode
+        var styleMapping = showUI(styles, autoConfig);
+        
+        // Check if user canceled the dialog
+        if (styleMapping) {
+            // Create progress bar with correct maximum value
+            createProgressBar(13);
+            
+            try {
+                // Wrap the core operations in a transaction
+                app.doScript(function() {
+                    // Get target story from selected frame, labeled frame, or first story
+                    updateProgressBar(1, I18n.__("gettingTargetStory"));
+                    var target = getTargetStory();
+                    
+                    // Reset to normal style before processing
+                    updateProgressBar(2, I18n.__("resettingStyles"));
+                    resetStyles(target, styleMapping);
+                    
+                    // Apply paragraph styles (headings, quotes, lists)
+                    updateProgressBar(3, I18n.__("applyingParagraphStyles"));
+                    applyParagraphStyles(target, styleMapping);
+                    
+                    // Apply character styles (bold, italic, etc.)
+                    updateProgressBar(4, I18n.__("applyingCharacterStyles"));
+                    applyCharacterStyles(target, styleMapping);
+                    
+                    // Process Pandoc attributes (inline and block classes)
+                    updateProgressBar(5, I18n.__("processingPandocAttributes"));
+                    applyPandocInlineClasses(target);
+                    applyPandocBlockClasses(target);
+                    
+                    // Process Markdown tables
+                    if (styleMapping.tableConfig && styleMapping.tableConfig.processTablesEnabled) {
+                        updateProgressBar(6, "Processing Markdown tables...");
+                        try {
+                            var tableCount = processMarkdownTables(target, {
+                                processTablesEnabled: true,
+                                tableStyle: styleMapping.tableConfig.tableStyle,
+                                useAlignment: styleMapping.tableConfig.useAlignment
+                            });
+                            $.writeln("Processed " + tableCount + " Markdown table(s)");
+                        } catch (tableError) {
+                            $.writeln("Error processing tables: " + tableError.message);
+                        }
+                    }
+                    
+                    // Process footnotes - collect definitions and create InDesign footnotes
+                    updateProgressBar(7, I18n.__("processingFootnotes"));
+                    processFootnotes(target, styleMapping);
+                    
+                    // Clean up text - remove multiple line breaks, escape chars, fix dashes
+                    updateProgressBar(8, I18n.__("cleaningUpText"));
+                    cleanupText(target);
+                    
+                    // Apply styles within footnotes
+                    updateProgressBar(9, I18n.__("processingFootnoteStyles"));
+                    processFootnoteStyles(styleMapping);
+                    
+                    // Restore escaped characters in footnotes
+                    updateProgressBar(10, "Restoring escaped characters in footnotes...");
+                    restoreEscapedCharactersInFootnotes();
+                    
+                    // Process Markdown images
+                    if (styleMapping.imageConfig) {
+                        updateProgressBar(11, I18n.__("processingImages"));
+                        try {
+                            // Save image folder path to document
+                            if (styleMapping.imageConfig.imageFolderPath) {
+                                var folder = new Folder(styleMapping.imageConfig.imageFolderPath);
+                                if (folder.exists) {
+                                    app.activeDocument.insertLabel("__img_base__", folder.fsName);
                                 }
-                            } catch (e) {
-                                $.writeln("Error while removing blank pages: " + e.message);
-                                // Continuer même en cas d'erreur
-                                updateProgressBar(11, I18n.__("done"));
                             }
                             
-                        // Complete!
-                        } else {
-                            updateProgressBar(11, I18n.__("done"));
+                            var baseFolder = getBaseFolder(app.activeDocument, true); // Silent mode
+                            if (baseFolder) {
+                                var imageCount = processStoryImages(target, baseFolder, styleMapping.imageConfig, true);
+                                $.writeln("Processed " + imageCount + " images");
+                            }
+                        } catch (imageError) {
+                            $.writeln("Error processing images: " + imageError.message);
                         }
-                    }, ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Markdown Import");
-                } finally {
-                    // Always ensure progress bar is closed, even if an error occurs
-                    closeProgressBar();
-                }
+                    }
+                    
+                    // Remove blank pages if requested
+                    if (styleMapping && styleMapping.removeBlankPages) {
+                        try {
+                            updateProgressBar(12, I18n.__("removingBlankPages"));
+                            var pagesRemoved = removeBlankPagesAfterTextEnd(doc);
+                            
+                            if (pagesRemoved > 0) {
+                                var pagesRemovedText = I18n.__("pagesRemoved", pagesRemoved);
+                                updateProgressBar(13, I18n.__("done") + " " + pagesRemovedText);
+                            } else {
+                                updateProgressBar(13, I18n.__("done"));
+                            }
+                        } catch (e) {
+                            $.writeln("Error while removing blank pages: " + e.message);
+                            updateProgressBar(13, I18n.__("done"));
+                        }
+                    } else {
+                        // Complete without removing pages
+                        updateProgressBar(13, I18n.__("done"));
+                    }
+                }, ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Markdown Import");
+            } finally {
+                // Always ensure progress bar is closed, even if an error occurs
+                closeProgressBar();
             }
-            
+        }
+        
         } catch (e) {
             // S'assurer de fermer la barre de progression en cas d'erreur
             closeProgressBar();
@@ -2221,6 +3829,9 @@ var MarkdownImport = (function() {
                 alert(I18n.__("genericError", e.message, e.line));
             }
         }
+        
+        app.scriptPreferences.enableRedraw = true;
+        app.preflightOptions.preflightOff = oldPreflight;    
     }
     
     // Public API
