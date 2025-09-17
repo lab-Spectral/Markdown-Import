@@ -28,7 +28,7 @@ Adobe InDesign CS6 ou plus récent (macOS/Windows)
   - [Images](#images)
   - [Tableaux](#tableaux)
 - [Nettoyage et finition](#nettoyage-et-finition)
-- [Journal des modifications v1.0b12a](#journal-des-modifications-v10b12a)
+- [Journal des modifications v1.0b11](#journal-des-modifications-v10b11)
 
 ---
 
@@ -163,7 +163,7 @@ Ordre de sélection :
 
 ---
 
-## Journal des modifications v1.0b12a
+## Journal des modifications v1.0b11
 
 - Ajout du support complet des **tableaux Markdown** → conversion en tableaux InDesign avec alignement & style
 - Ajout des **attributs & classes Pandoc** (inline + block) → appliquer des styles de paragraphe/caractère, définir des labels de blocs
