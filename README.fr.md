@@ -1,4 +1,4 @@
-<div align="right"><sub><a href="README.md">🇬🇧 Read in English</a></sub></div>
+<div align="right"><sub><a href="/">🇬🇧 Read in English</a></sub></div>
 <img src="docs/images/automaticbook-logo.png" alt="Mon logo" width="200"/>
 
 # Markdown-Import
