@@ -1,11 +1,10 @@
+<div align="right"><sub><a href="README.md">🇬🇧 Read in English</a></sub></div>
 <img src="docs/images/automaticbook-logo.png" alt="Mon logo" width="200"/>
 
 # Markdown-Import
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/v/release/lab-Spectral/Markdown-Import?include_prereleases&sort=semver)](https://github.com/lab-Spectral/Markdown-Import/releases/latest)
-
-<div align="right"><sub><a href="README.md">🇬🇧 Read in English</a></sub></div>
 
 Ce script pour Adobe InDesign importe automatiquement un texte Markdown et le transforme en document stylé, prêt pour la mise en page. Il remplace les balises Markdown par les styles de paragraphe et de caractère correspondants, convertit les notes de bas de page en véritables notes InDesign, et prend désormais en charge des fonctionnalités avancées comme les **tableaux**, **images** et **attributs Pandoc**.
 
@@ -24,10 +23,10 @@ Adobe InDesign CS6 ou plus récent (macOS/Windows)
 - [Résolution de l’histoire cible](#resolution-de-lhistoire-cible)
 - [Prise en charge de Markdown](#prise-en-charge-de-markdown)
   - [Bloc](#bloc)
-  - [Tableaux](#tableaux)
   - [En ligne](#en-ligne)
   - [Notes de bas de page](#notes-de-bas-de-page)
   - [Images](#images)
+  - [Tableaux](#tableaux)
 - [Nettoyage et finition](#nettoyage-et-finition)
 - [Journal des modifications v1.0b12a](#journal-des-modifications-v10b12a)
 
@@ -115,18 +114,6 @@ Ordre de sélection :
 
 > Non gérés pour l’instant : **listes numérotées** et **listes imbriquées**.
 
-### Tableaux
-
-* **Tables à barres verticales** avec en-tête et ligne de séparation
-  * Alignement via `:---` (gauche), `:---:` (centré), `---:` (droite)
-  * Une ligne par rangée Markdown ; barres d’ouverture/fermeture optionnelles
-* **Conversion** en **tableaux InDesign** natifs
-  * Nombre de colonnes déduit de l’en-tête, alignement par colonne conservé
-  * Application optionnelle d’un **style de tableau** (via UI ou `.mdconfig` → `"table"`)
-* **Notes / limites**
-  * Pas de cellules fusionnées (row/col span) ni de cellules multi-lignes
-  * Traitement des tableaux de bas en haut pour stabiliser les offsets de caractères
-
 ### En ligne
 
 * **Gras** : `**texte**` / `__texte__`
@@ -151,6 +138,18 @@ Ordre de sélection :
 * Blocs **ancrés** avec styles d’objet
 * **Légende** optionnelle (depuis `alt`) sous l’image avec style de paragraphe
 * Ratio **fixe/libre** configurable, hauteur max, et auto-détection du dossier de base
+
+### Tableaux
+
+* **Tables à barres verticales** avec en-tête et ligne de séparation
+  * Alignement via `:---` (gauche), `:---:` (centré), `---:` (droite)
+  * Une ligne par rangée Markdown ; barres d’ouverture/fermeture optionnelles
+* **Conversion** en **tableaux InDesign** natifs
+  * Nombre de colonnes déduit de l’en-tête, alignement par colonne conservé
+  * Application optionnelle d’un **style de tableau** (via UI ou `.mdconfig` → `"table"`)
+* **Notes / limites**
+  * Pas de cellules fusionnées (row/col span) ni de cellules multi-lignes
+  * Traitement des tableaux de bas en haut pour stabiliser les offsets de caractères
 
 ---
 
