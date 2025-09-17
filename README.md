@@ -1,3 +1,4 @@
+<div align="right"><sub><a href="README.fr.md">🇫🇷 Lire en français</a></sub></div>
 <img src="docs/images/automaticbook-logo.png" alt="Mon logo" width="200"/>
 
 # Markdown-Import
@@ -12,6 +13,7 @@ Adobe InDesign CS6 or newer (macOS/Windows)
 
 ➡️ [Download latest release](https://github.com/lab-Spectral/Markdown-Import/releases/latest)
 
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -20,12 +22,12 @@ Adobe InDesign CS6 or newer (macOS/Windows)
 - [Target Story Resolution](#target-story-resolution)
 - [Markdown Support](#markdown-support)
   - [Block-level](#block-level)
-  - [Tables](#tables)
   - [Inline](#inline)
   - [Footnotes](#footnotes)
   - [Images](#images)
+  - [Tables](#tables)
 - [Cleanup & Finishing](#cleanup--finishing)
-- [Changelog v1.0b12a](#changelog-v10b12a)
+- [Changelog v1.0b11](#changelog-v10b11)
 
 ---
 
@@ -158,7 +160,7 @@ The script chooses the target story in this order:
 
 * Collapse **multiple line breaks** to a single paragraph break
 * Convert `--` to an **en-dash** (–)
-* Convert `–-` to an **em-dash** (—)
+* Convert `---` or `–-` to an **em-dash** (—)
 * Convert Markdown hard breaks (two spaces + return) to line breaks
 * Optional: **remove blank pages** after the actual end of the imported story; in facing-pages documents, add a page if needed to keep spreads aligned
 
