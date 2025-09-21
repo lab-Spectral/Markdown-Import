@@ -157,7 +157,7 @@ Ordre de sélection :
 
 * Fusionner les **sauts de ligne multiples** en un seul retour de paragraphe
 * Convertir `--` en **tiret demi-cadratin** (–)
-* Convertir `–-` en **tiret cadratin** (—)
+* Convertir `---` en **tiret cadratin** (—)
 * Convertir les **retours forcés Markdown** (deux espaces + retour) en **sauts de ligne**
 * Optionnel : **supprimer les pages blanches** après la fin effective du texte importé ; dans les documents en vis-à-vis, ajouter une page si nécessaire pour conserver l’alignement des doubles pages
 
