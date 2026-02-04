@@ -29,7 +29,7 @@ rights, branding permissions, and professional support.
 
 For the complete license terms and contribution policies, including Contributor License Agreements, please refer to:
 
-- [LICENSE GNU Affero General Public License v3.0](../../LICENSE)
+- [LICENSE GNU Affero General Public License v3.0](agpl-3-0_license)
 - [LICENSE MIT](../../LICENSE)
 - [LICENSE Creative Commons Attribution-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-sa/4.0/)
 - [Contribution rules and contributor agreements](../../CONTRIBUTING.md)
