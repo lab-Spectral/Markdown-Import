@@ -423,7 +423,7 @@ var MarkdownImport = (function() {
         bold: /\*\*([^\*]+)\*\*/,
         boldUnderscore: /__([^_]+)__/,
         italic: /\*([^\*]+)\*/,
-        italicUnderscore: /_([^_]+)_/,
+        italicUnderscore: /\s*_([^_]+)_\s*/,
         underline: /\[([^\]]+)\]\{\.underline\}/,
         smallCapsAttr: /\[([^\]]+)\]\{\.smallcaps\}/,
         superscript: /\^([^^\r\]]+)\^/,
